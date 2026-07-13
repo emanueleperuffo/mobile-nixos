@@ -579,7 +579,7 @@ stdenv.mkDerivation (inputArgs // {
     # appropriately for different quirks.
     inherit isQcdt isExynosDT;
 
-    inherit target;
+    inherit target buildDTBs;
     inherit baseVersion modDirVersion;
     kernelOlder = lib.versionOlder baseVersion;
     kernelAtLeast = lib.versionAtLeast baseVersion;
