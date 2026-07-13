@@ -155,14 +155,23 @@ in
 , isModular ? true
 , kernelPatches ? []
 
-# Used as `.file` on the package to know the kernel image filename.
-, kernelFile ? kernelTarget + optionalString isImageGzDtb "-dtb"
+# This target is exposed as `target` on the kernel.
+, target ?
+    if stdenv.hostPlatform.isx86 then
+      "bzImage"
+    else if stdenv.hostPlatform.isAarch32 then
+      "zImage"
+    else if stdenv.hostPlatform.isAarch64 || stdenv.hostPlatform.isRiscV then
+      # NOTE: isCompressed must be `"gz"` when `CONFIG_COMPRESSED_INSTALL` is not explicitly unset.
+      # Also note that we ***cannot*** read `CONFIG_COMPRESSED_INSTALL` at evaluation time.
+      "Image${if isCompressed != false then ".${isCompressed}" else ""}"
+    else if stdenv.hostPlatform.isLoongArch64 then
+      "vmlinuz.efi"
+    else
+      "vmlinux"
 
-# Used to provide the default kernelFile
-, kernelFileExtension ? if isCompressed != false then ".${isCompressed}" else ""
-, kernelTarget ? if platform.linux-kernel.target == "Image"
-    then "${platform.linux-kernel.target}${kernelFileExtension}"
-    else platform.linux-kernel.target
+, buildDTBs ?
+    stdenv.hostPlatform.isAarch || stdenv.hostPlatform.isRiscV || stdenv.hostPlatform.isLoongArch64
 
 , ...
 } @ inputArgs:
@@ -194,8 +203,6 @@ let
   pkg-config-helper = writeShellScriptBin "pkg-config" ''
     exec ${buildPackages.pkg-config}/bin/${buildPackages.pkg-config.targetPrefix}pkg-config "$@"
   '';
-
-  hasDTB = platform.linux-kernel ? DTB && platform.linux-kernel.DTB;
 in
 
 # This `let` block allows us to have a self-reference to this derivation.
@@ -217,7 +224,7 @@ stdenv.mkDerivation (inputArgs // {
 
   depsBuildBuild = [ buildPackages.stdenv.cc ];
   nativeBuildInputs = [ perl bc net-tools openssl rsync gmp libmpc mpfr ]
-    ++ optional (platform.linux-kernel.target == "uImage") buildPackages.ubootTools
+    ++ optional (target == "uImage") buildPackages.ubootTools
     ++ optional (lib.versionAtLeast version "4.14" && lib.versionOlder version "5.8") libelf
     ++ optional (lib.versionAtLeast version "4.15") util-linux
     ++ optionals (lib.versionAtLeast version "4.16") [ bison flex ]
@@ -443,10 +450,10 @@ stdenv.mkDerivation (inputArgs // {
   '';
 
   buildFlags = [
-    kernelTarget
+    target
     "vmlinux"  # for "perf" and things like that
   ]
-    ++ optional isImageGzDtb "${kernelTarget}-dtb"
+    ++ optional isImageGzDtb "${target}-dtb"
     ++ optional isModular "modules"
   ;
 
@@ -488,7 +495,7 @@ stdenv.mkDerivation (inputArgs // {
     rm -vf "$out/lib/modules/${modDirVersion}/build"
     rm -vf "$out/lib/modules/${modDirVersion}/source"
 
-  '' + optionalString hasDTB ''
+  '' + optionalString buildDTBs ''
     echo ":: Installing DTBs"
     mkdir -p $out/dtbs/
     make $makeFlags "''${makeFlagsArray[@]}" dtbs dtbs_install INSTALL_DTBS_PATH=$out/dtbs
@@ -511,7 +518,7 @@ stdenv.mkDerivation (inputArgs // {
 
   '' + optionalString isImageGzDtb ''
     echo ":: Copying platform-specific -dtb image file"
-    cp -v "$buildRoot/arch/${platform.linuxArch}/boot/${kernelTarget}-dtb" "$out/"
+    cp -v "$buildRoot/arch/${platform.linuxArch}/boot/${target}-dtb" "$out/"
 
   '' + optionalString (dtboImg != false) ''
    echo ":: Building dtbo.img"
@@ -572,12 +579,10 @@ stdenv.mkDerivation (inputArgs // {
     # appropriately for different quirks.
     inherit isQcdt isExynosDT;
 
+    inherit target buildDTBs;
     inherit baseVersion modDirVersion;
     kernelOlder = lib.versionOlder baseVersion;
     kernelAtLeast = lib.versionAtLeast baseVersion;
-
-    # Used by consumers to refer to the kernel build product.
-    file = kernelFile;
 
     # Used to update the config.
     normalizedConfig = configUpdater {};
