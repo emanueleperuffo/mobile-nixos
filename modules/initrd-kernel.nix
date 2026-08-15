@@ -245,8 +245,13 @@ in
         else (lib.recurseIntoAttrs (pkgs.linuxPackagesFor cfg.package))
       );
 
-      system.boot.loader.kernelFile = mkIf (cfg.package != null && cfg.package ? file) (
-        mkDefault cfg.package.file
+      system.boot.loader.kernelFile = mkIf (cfg.package != null && (cfg.package ? file || cfg.package ? target)) (
+        # The mobile-nixos kernel builder exposes the built image name as
+        # `target` (e.g. `Image.gz`), while upstream nixpkgs kernels use
+        # `file`. Without this, `boot.loader.kernelFile` falls back to the
+        # platform default (`Image` on aarch64), which does not exist in the
+        # mobile kernel output and fails the NixOS toplevel build.
+        mkDefault (if cfg.package ? file then cfg.package.file else cfg.package.target)
       );
 
       # Disable kernel config checks as it's EXTREMELY nixpkgs-kernel centric.

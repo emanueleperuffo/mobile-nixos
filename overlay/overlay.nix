@@ -48,6 +48,7 @@ in
     tqftpserv = callPackage ./qrtr/tqftpserv.nix { };
     pd-mapper = callPackage ./qrtr/pd-mapper.nix { };
     rmtfs = callPackage ./qrtr/rmtfs.nix { };
+    q6voiced = callPackage ./q6voiced.nix { };
 
     lk2ndMsm8953 = callPackage ./lk2nd/msm8953.nix {};
 
@@ -63,6 +64,18 @@ in
         ./xserver/0001-HACK-fbdev-don-t-bail-on-mode-initialization-fail.patch
       ];
     });
+
+    # systemd's BPF framework (enabled by default on aarch64) compiles its BPF
+    # programs with `clang -target bpf`. Under a nixpkgs cross build that
+    # compiler has no sysroot and cannot find the kernel UAPI (linux/types.h)
+    # or libc (errno.h) headers, so the build fails. The framework only powers
+    # optional per-unit network/filesystem sandboxing (IPAddressAllow=,
+    # SocketBindAllow=, RestrictFileSystems=, BPFProgram=); seccomp-based
+    # restrictions still work and firewalling uses nftables/iptables, so this
+    # is a safe no-op for the default build.
+    systemd = super.systemd.override {
+      withLibBPF = false;
+    };
 
     #
     # Fixes to upstream

@@ -296,6 +296,7 @@ rec {
 
         # Cross builds
         device.motorola-potter.x86_64-linux          # Android
+        device.xiaomi-mido.x86_64-linux              # Android
         device.asus-dumo.x86_64-linux                # Depthcharge
 
         # Example systems
@@ -308,6 +309,7 @@ rec {
       ]
       ++ lib.optionals (hasSystem "aarch64-linux") [
         device.motorola-potter.aarch64-linux         # Android
+        device.xiaomi-mido.aarch64-linux             # Android
         device.asus-dumo.aarch64-linux               # Depthcharge
 
         # Example systems

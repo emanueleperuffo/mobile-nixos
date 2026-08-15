@@ -22,6 +22,7 @@
   ./hardware-ram.nix
   ./hardware-rockchip.nix
   ./hardware-screen.nix
+  ./hardware-touchscreen.nix
   ./hardware-soc.nix
   ./hardware.nix
   ./initrd-base.nix

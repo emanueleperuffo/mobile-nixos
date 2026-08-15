@@ -1,0 +1,96 @@
+= Xiaomi Redmi Note 4
+include::_support/common.inc[]
+//
+// DEV NOTE (not rendered): the full step-by-step build & flash instructions
+// are generated automatically from
+// modules/system-types/android/device-notes.lk2nd.adoc.erb and shown on the
+// rendered device page (see doc/_support/devices/generate-devices-listing.rb),
+// so do NOT duplicate a "Building and flashing" section here.
+//
+// Full manual reference:
+//   $ nix-build --argstr device xiaomi-mido -A outputs.android-fastboot-images
+//   $ nix-build --argstr device xiaomi-mido -A pkgs.lk2ndMsm8953 -o lk2nd
+//   $ fastboot flash boot lk2nd/lk2nd.img
+//   reboot to lk2nd fastboot (hold Volume Down while booting), then:
+//   $ fastboot flash userdata result/system.img
+//   $ fastboot flash recovery result/recovery.img
+//   reboot to Recovery mode, then via adb:
+//   ~ # mke2fs /dev/disk/by-partlabel/system
+//   ~ # mkdir /mnt2
+//   ~ # mount /dev/disk/by-partlabel/system /mnt2
+//   $ adb push result/boot.img /mnt2
+//   $ adb reboot
+//
+// These instructions require `adbd` to be enabled, e.g. add
+// `{ lib, ... }: { mobile.adbd.enable = true; }` to local.nix.
+
+== Device-specific notes
+
+This device is part of the generic https://github.com/msm8953-mainline[msm8953-mainline] port, sharing the kernel and boot stack with the other Qualcomm MSM8953/SDM450/SDM632 devices.
+
+=== Touchscreen
+
+mido ships with either a FocalTech FT5435 or a Goodix GT917D touch controller.
+The one fitted to your unit is selected at build time via
+`mobile.hardware.touchscreen` (default `"focaltech"`); the matching device tree
+node is enabled in the boot image during the build.
+
+Check which one you have once booted:
+
+```
+ $ dmesg | grep -iE "goodix|edt|ft5"
+```
+
+=== RAM
+
+The Redmi Note 4 ships in 2GB, 3GB and 4GB variants. The device default (3GB) is intentionally set as a low-priority default so it can be overridden cleanly. If your unit has 4GB, set it in your `configuration.nix`:
+
+```
+{ config, lib, pkgs, ... }:
+{
+  mobile.hardware.ram = 1024 * 4;
+  ...
+}
+```
+
+A plain assignment is enough (no `mkForce` needed), since the default is only a `mkDefault`.
+
+== Firmware
+
+=== GPU (bundled)
+
+The Adreno 506 ZAP shader firmware (`a506_zap.mdt` / `a506_zap.b02`) is bundled into the initrd automatically via `mobile.boot.stage-1.firmware`. It is sourced from the OEM firmware dump kept in https://github.com/Kiciuk/proprietary_firmware_mido[`Kiciuk/proprietary_firmware_mido`], the same source postmarketOS uses. No action is needed.
+
+=== Modem and Wi-Fi firmware
+
+The proprietary firmware is *not* bundled into the image. Instead, the stock
+`modem` (FAT16) and `persist` (ext4) partitions are mounted read-only at boot
+and exposed to the kernel through `firmware_class.path=/run/firmware` (see
+`modules/quirks/qualcomm/msm8953-modem.nix`).
+
+No manual copy is needed, but make sure those partitions exist and still
+contain the stock firmware (e.g. from the stock image or a TWRP backup). The
+`wcn36xx` (Wi-Fi) and `qcom_q6v5_mss` (modem) drivers are loaded only once the
+firmware is in place.
+
+== Connectivity
+
+=== Wi-Fi
+
+WCNSS Wi-Fi is driven by the `wcn36xx` kernel driver. The network stack is
+managed by NetworkManager using the `iwd` backend:
+
+```
+ $ nmcli device wifi connect "<SSID>" password "<password>"
+```
+
+=== Cellular modem
+
+The modem runs on `qrtr-ns` and `rmtfs` (which shares the modem's EFS/NV
+region), and is managed by ModemManager through NetworkManager.
+
+[NOTE]
+Modem support is still best-effort. `rmtfs` serves the modem's partition-backed
+region with `-P`; confirm `/dev/disk/by-partlabel/` contains `modemst1`,
+`modemst2`, `fsc` and `fsg`, and that ModemManager detects the modem. Voice
+calls (`q6voiced`) are not wired up yet.

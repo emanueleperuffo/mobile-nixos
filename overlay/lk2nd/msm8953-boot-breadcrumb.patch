@@ -1,0 +1,66 @@
+--- a/lk2nd/boot/boot.c
++++ b/lk2nd/boot/boot.c
+@@ -28,9 +28,12 @@
+ 	int ret;
+ 
+ 	dprintf(INFO, "boot: Trying to boot from the file system...\n");
++	dprintf(ALWAYS, "CRASHBP: scan_devices start\n");
+ 
+ 	list_for_every_entry(&bdevs->list, bdev, bdev_t, node) {
+ 
++		dprintf(ALWAYS, "CRASHBP: bdev %s size=%d leaf=%d\n", bdev->name, (int)bdev->size, (int)bdev->is_leaf);
++
+ 		/* Skip top level block devices. */
+ 		if (!bdev->is_leaf)
+ 			continue;
+@@ -47,7 +50,9 @@
+ 			continue;
+ 
+ 		snprintf(mountpoint, sizeof(mountpoint), "/%s", bdev->name);
++		dprintf(ALWAYS, "CRASHBP: fs_mount %s\n", bdev->name);
+ 		ret = fs_mount(mountpoint, "ext2", bdev->name);
++		dprintf(ALWAYS, "CRASHBP: fs_mount %s ret=%d\n", bdev->name, ret);
+ 		if (ret < 0)
+ 			continue;
+ 
+@@ -74,10 +79,15 @@
+ {
+ 	static bool init_done = false;
+ 
++	dprintf(ALWAYS, "CRASHBP: lk2nd_boot enter\n");
+ 	if (!init_done) {
++		dprintf(ALWAYS, "CRASHBP: bdev_init enter\n");
+ 		lk2nd_bdev_init();
++		dprintf(ALWAYS, "CRASHBP: bdev_init done\n");
+ 		init_done = true;
+ 	}
+ 
++	dprintf(ALWAYS, "CRASHBP: scan_devices enter\n");
+ 	lk2nd_scan_devices();
++	dprintf(ALWAYS, "CRASHBP: scan_devices done\n");
+ }
+--- a/lk2nd/hw/bdev/bdev.c
++++ b/lk2nd/hw/bdev/bdev.c
+@@ -2,6 +2,7 @@
+ /* Copyright (c) 2023 Nikita Travkin <nikita@trvn.ru> */
+ 
+ #include <compiler.h>
++#include <debug.h>
+ #include <lk2nd/hw/bdev.h>
+ 
+ #include "bdev.h"
+@@ -11,9 +12,13 @@
+  */
+ void lk2nd_bdev_init(void)
+ {
++	dprintf(ALWAYS, "CRASHBP: bdev wrapper\n");
+ 	lk2nd_wrapper_bio_register();
+-	if (IS_ENABLED(MMC_SDHCI_SUPPORT))
++	if (IS_ENABLED(MMC_SDHCI_SUPPORT)) {
++		dprintf(ALWAYS, "CRASHBP: bdev mmc_sdhci\n");
+ 		lk2nd_mmc_sdhci_bio_register();
++	}
+ 
++	dprintf(ALWAYS, "CRASHBP: bdev dump\n");
+ 	lk2nd_bdev_dump_devices();
+ }

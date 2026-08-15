@@ -10,19 +10,17 @@ let
   inherit (import ./npins)
     nixpkgs
   ;
-  channelInfo =
-    builtins.match
-      # https://releases.nixos.org/nixos/unstable/nixos-25.05beta723344.d3c42f187194/nixexprs.tar.xz
-      "https?://(.*)/([^/]+)/([^/]+)/([^/]+)/.*"
-      nixpkgs.url
-  ;
-  channelName =
-    builtins.concatStringsSep "-" [
-      (builtins.elemAt channelInfo 1)
-      (builtins.elemAt channelInfo 2)
-    ]
-  ;
-  identifier = builtins.elemAt channelInfo 3;
+  # Parse the channel name and identifier out of the pinned Nixpkgs URL.
+  # Handles both the legacy releases.nixos.org layout
+  #   https://releases.nixos.org/nixos/<channel>/<full>/nixexprs.tar.xz
+  # and the newer channels.nixos.org layout
+  #   https://channels.nixos.org/<channel>/nixexprs.tar.xz
+  segs = builtins.filter
+    (x: builtins.isString x && x != "")
+    (builtins.split "/" nixpkgs.url);
+  isLegacy = builtins.elemAt segs 2 == "nixos";
+  channelName = if isLegacy then builtins.elemAt segs 3 else builtins.elemAt segs 2;
+  identifier = if isLegacy then builtins.elemAt segs 4 else builtins.elemAt segs 2;
 in
 builtins.trace "(Using pinned Nixpkgs; ${channelName} @ ${identifier})"
 (import nixpkgs)

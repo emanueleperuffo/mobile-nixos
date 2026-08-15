@@ -17,6 +17,9 @@ stdenv.mkDerivation rec {
     libconfig
     libusbgx
   ];
+  cmakeFlags = [
+    "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+  ];
   sourceRoot = "${src.name}/source";
   src = fetchFromGitHub {
     owner = "linux-usb-gadgets";

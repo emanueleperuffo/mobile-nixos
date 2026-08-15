@@ -1,0 +1,14 @@
+--- a/app/aboot/aboot.c
++++ b/app/aboot/aboot.c
+@@ -1654,6 +1654,11 @@
+ 			ptn_name = "recovery";
+ 		}
+ 	}
++	/* mido: the `boot` partition only holds lk2nd itself, and the
++	 * NixOS boot.img is flashed raw onto the `system` partition, so
++	 * boot from there directly (like the recovery partition path). */
++	if (!boot_into_recovery)
++		ptn_name = "system";
+ 
+ 	index = partition_get_index(ptn_name);
+ 	ptn = partition_get_offset(index);

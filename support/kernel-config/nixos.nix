@@ -186,7 +186,10 @@ in
       FW_LOADER_COMPRESS = whenAtLeast "5.3" yes;
       FW_LOADER_COMPRESS_ZSTD = whenAtLeast "5.19" yes;
       PREEMPT = no;
-      PREEMPT_VOLUNTARY = yes;
+      # Linux ≥6.12 renamed the voluntary preemption model on arches that
+      # select ARCH_HAS_PREEMPT_LAZY (e.g. aarch64) to CONFIG_PREEMPT_LAZY.
+      PREEMPT_VOLUNTARY = whenOlder "6.12" yes;
+      PREEMPT_LAZY = whenAtLeast "6.12" yes;
       SCHED_SMT = yes;
       SCHED_CORE = whenAtLeast "5.14" yes;
       LRU_GEN = whenAtLeast "6.1"  yes;
