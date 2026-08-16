@@ -47,8 +47,6 @@ in stdenv.mkDerivation {
   patches = [
     ./msm8953-touchscreen.patch
     ./msm8953-fbcon.patch
-    ./msm8953-halt-noreboot.patch
-    ./msm8953-boot-breadcrumb.patch
     ./msm8953-system-boot.patch
   ];
 
@@ -61,9 +59,6 @@ in stdenv.mkDerivation {
   makeFlags = [
     "LK2ND_VERSION=23.1"
     "TOOLCHAIN_PREFIX=arm-none-eabi-"
-    # Keep the device sitting on the crash screen instead of watchdog-rebooting,
-    # so the lk fault dump (prefetch/data abort registers) can be read.
-    "PANIC_REBOOT_MODE=NO_REBOOT"
     # The makefile only overrides `LD` from TOOLCHAIN_PREFIX when `$(LD)` is
     # exactly `ld`; in a cross build the stdenv sets `LD` to the host cross
     # linker, so we must pin it to the bare-metal linker explicitly.

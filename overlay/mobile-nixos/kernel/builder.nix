@@ -552,6 +552,11 @@ stdenv.mkDerivation (inputArgs // {
   ]
   ++ optional isModular "INSTALL_MOD_PATH=$(out)"
   ++ optional installsFirmware "INSTALL_FW_PATH=$(out)/lib/firmware"
+  # Since Linux 7.x, modules_install's depmod step is handled by
+  # scripts/depmod.sh which reads the DEPMOD variable from the environment
+  # (falling back to bare `depmod`, which is not on PATH here). Pass the kmod
+  # depmod explicitly so modules.dep/modules.alias/modules.symbols are generated.
+  ++ optional (isModular && (lib.versionAtLeast version "7.0")) "DEPMOD=${buildPackages.kmod}/bin/depmod"
   ;
 
 

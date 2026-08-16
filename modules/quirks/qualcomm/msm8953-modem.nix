@@ -73,19 +73,35 @@ in
         script = ''
           set -eu
           fwdir=/run/firmware
-          # modem + wcnss + adsp firmware live under `image/` on the modem partition
-          for f in "$fwdir/modem/image/"*; do
-            ln -sfn "$f" "$fwdir/$(basename "$f")"
+          FW=/lib/firmware
+
+          # Copy (not symlink) the firmware into /lib/firmware as real files.
+          # The kernel's request_firmware reliably finds files there (the
+          # firmware_class.path=/run/firmware path does not traverse the
+          # partition-mounted symlinks, and it races with module autoload at
+          # boot), and the WCNSS PIL/NV expect specific subpaths:
+          #   wcnss.mdt / modem.mdt / mba.mbn / adsp.mdt  -> /lib/firmware/
+          #   WCNSS_qcom_wlan_nv.bin, ...                 -> /lib/firmware/wlan/prima/
+          mkdir -p "$FW/wlan/prima"
+          for f in wcnss modem mba adsp; do
+            cp -a "$fwdir/modem/image/$f"* "$FW/" 2>/dev/null || true
           done
-          # Wi-Fi NV + dictionary live at the root of the persist partition
-          ln -sfn "$fwdir/persist/WCNSS_qcom_wlan_nv.bin"    "$fwdir/WCNSS_qcom_wlan_nv.bin"
-          ln -sfn "$fwdir/persist/WCNSS_wlan_dictionary.dat" "$fwdir/WCNSS_wlan_dictionary.dat"
-          # Small redistributable config, shipped from the Nix store
-          ln -sfn ${wcnssCfg} "$fwdir/WCNSS_qcom_cfg.ini"
-          # Trigger the (modular) remoteproc drivers now that their firmware is
-          # visible; loading the modules also starts the respective remoteprocs.
-          modprobe wcn36xx || true
-          modprobe qcom_q6v5_mss || true
+          cp -a "$fwdir/persist/WCNSS_qcom_wlan_nv.bin"    "$FW/wlan/prima/"
+          cp -a "$fwdir/persist/WCNSS_wlan_dictionary.dat" "$FW/wlan/prima/"
+          cp -a ${wcnssCfg} "$FW/wlan/prima/WCNSS_qcom_cfg.ini"
+
+          # (Re)load the remoteproc drivers and wcn36xx now that the firmware is
+          # in place. Note: systemd services have a restricted PATH, so use the
+          # full path to modprobe.
+          ${pkgs.kmod}/bin/modprobe qcom_q6v5_mss || true
+          ${pkgs.kmod}/bin/modprobe wcn36xx || true
+
+          # Kick the remoteprocs that probed-and-failed at boot (before the
+          # firmware was available) so they now load wcnss.mdt / mba.mbn /
+          # modem.mdt. Failures are ignored (e.g. the modem needs rmtfs first).
+          for r in /sys/class/remoteproc/*/; do
+            echo start > "$r/state" 2>/dev/null || true
+          done
         '';
       };
 

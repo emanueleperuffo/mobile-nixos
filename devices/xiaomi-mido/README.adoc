@@ -7,9 +7,9 @@ include::_support/common.inc[]
 // rendered device page (see doc/_support/devices/generate-devices-listing.rb),
 // so do NOT duplicate a "Building and flashing" section here.
 //
-// Full manual reference:
+// Manual reference:
 //   $ nix-build --argstr device xiaomi-mido -A outputs.android-fastboot-images
-//   $ nix-build --argstr device xiaomi-mido -A pkgs.lk2ndMsm8953 -o lk2nd
+//   $ nix-build --argstr device xiaomi-mido -A pkgs.lk2ndMsm8953 -o result-lk2nd
 //   $ fastboot flash boot lk2nd/lk2nd.img
 //   reboot to lk2nd fastboot (hold Volume Down while booting), then:
 //   $ fastboot flash userdata result/system.img

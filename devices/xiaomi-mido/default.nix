@@ -15,7 +15,9 @@ let
     then "touchscreen@5d"
     else "touchscreen@38";
 
-  midoDTB = "${config.mobile.boot.stage-1.kernel.package}/dtbs/qcom/msm8953-xiaomi-mido.dtb";
+  midoKernelPackage = config.mobile.boot.stage-1.kernel.package;
+
+  midoDTB = "${midoKernelPackage}/dtbs/qcom/msm8953-xiaomi-mido.dtb";
 
   # NOTE: This build-time patch is a stopgap for the lk2nd rev pinned in this
   # repo (msm8953-mainline/lk2nd @ 5912c91), which does not enable a touchscreen
@@ -72,8 +74,14 @@ in
     };
 
     mobile.boot.stage-1.firmware = [
-      # Adreno 506 ZAP shader firmware, needed for the GPU/DRM driver in stage-1.
+      # Adreno 506 (GPU/DRM) firmware: ZAP shader + a530 microcode, stage-1.
       (pkgs.callPackage ./firmware { })
+    ];
+
+    # Wireless regulatory database for cfg80211 (Wi-Fi channels/TX power per
+    # country). Wired into the rootfs /lib/firmware so the kernel can find it.
+    hardware.firmware = [
+      pkgs.wireless-regdb
     ];
 
     mobile.boot.stage-1.kernel.modules = [
@@ -91,6 +99,11 @@ in
       "pwm-bl"
       "leds-qcom-lpg"
       "qcom-pbs"
+      "uinput"              # virtual input devices (mido-navkeys)
+    ];
+
+    mobile.boot.stage-1.extraUtils = with pkgs; [
+      gptfdisk
     ];
 
     networking.networkmanager = {
@@ -98,11 +111,42 @@ in
       wifi.backend = "iwd";
     };
 
+    # Power button short-press is ignored: binding it to suspend caused a hang
+    # (watchdog reset) on this kernel, while a manual `systemctl suspend`
+    # suspends/resumes reliably. Sleep with `systemctl suspend`, wake with the
+    # power button.
+    services.logind.settings.Login.HandlePowerKey = "ignore";
+    # Long-press power keeps the logind default (poweroff) — an explicit escape
+    # hatch to shut the device down.
+    services.logind.settings.Login.HandlePowerKeyLongPress = "poweroff";
+
     networking.modemmanager.enable = true;
 
     systemd.services.ModemManager = {
-      after = [ "qrtr-ns.service" "mobile-msm8953-firmware.service" ];
+      # ModemManager is otherwise only D-Bus-activated; pull it into normal
+      # boot so it is up and probing the QRTR modem on every start.
+      wantedBy = [ "multi-user.target" ];
+      after = [ "qrtr-ns.service" "rmtfs.service" "mobile-msm8953-firmware.service" ];
       requires = [ "mobile-msm8953-firmware.service" ];
+      # The modem can take a moment to show up on QRTR after the remoteproc
+      # boots; keep retrying so ModemManager reliably comes up on every boot.
+      serviceConfig = {
+        Restart = "always";
+        RestartSec = "2s";
+      };
+    };
+
+    # The FT5x06 touchscreen exposes the bottom capacitive nav-button strip as
+    # ordinary touch coordinates (there are no real KEY_BACK/HOME/MENU events).
+    # Translate bottom-strip touch-downs into key events via uinput.
+    systemd.services.mido-navkeys = {
+      description = "mido nav-button to key translation";
+      wantedBy = [ "multi-user.target" ];
+      serviceConfig = {
+        ExecStart = "${pkgs.callPackage ./navkeys { }}/bin/mido-navkeys";
+        Restart = "always";
+        RestartSec = "2s";
+      };
     };
 
     # The stock Android `system` partition is repurposed to hold the stage-1

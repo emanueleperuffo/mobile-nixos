@@ -1,0 +1,70 @@
+# echo p | gdisk /dev/mmcblk0mmcblk0
+GPT fdisk (gdisk) version 1.0.10
+
+Partition table scan:
+  MBR: protective
+  BSD: not present
+  APM: not present
+  GPT: present
+
+Found valid GPT with protective MBR; using GPT.
+
+Command (? for help): Disk /dev/mmcblk0: 122142720 sectors, 58.2 GiB
+Sector size (logical/physical): 512/512 bytes
+Disk identifier (GUID): 98101B32-BBE2-4BF2-A06E-2BB33D000C20
+Partition table holds up to 52 entries
+Main partition table begins at sector 2 and ends at sector 14
+First usable sector is 34, last usable sector is 122142686
+Partitions will be aligned on 2-sector boundaries
+Total free space is 1035500 sectors (505.6 MiB)
+
+Number  Start (sector)    End (sector)  Size       Code  Name
+   1          131072          303103   84.0 MiB    0700  modem
+   2          393216          393217   1024 bytes  A029  fsc
+   3          393218          393233   8.0 KiB     A02C  ssd
+   4          393234          394257   512.0 KiB   A012  sbl1
+   5          394258          395281   512.0 KiB   0700  sbl1bak
+   6          395282          396305   512.0 KiB   A018  rpm
+   7          396306          397329   512.0 KiB   0700  rpmbak
+   8          397330          401425   2.0 MiB     A016  tz
+   9          401426          405521   2.0 MiB     0700  tzbak
+  10          405522          406033   256.0 KiB   FFFF  devcfg
+  11          406034          406545   256.0 KiB   FFFF  devcfgbak
+  12          406546          439313   16.0 MiB    0700  dsp
+  13          439314          442385   1.5 MiB     A027  modemst1
+  14          442386          445457   1.5 MiB     A028  modemst2
+  15          524288          524351   32.0 KiB    A01A  DDR
+  16          524352          527423   1.5 MiB     A02A  fsg
+  17          527424          527455   16.0 KiB    A01D  sec
+  18          655360          677887   11.0 MiB    A036  splash
+  19          786432          788479   1024.0 KiB  A015  aboot
+  20          788480          790527   1024.0 KiB  0700  abootbak
+  21          790528          921599   64.0 MiB    A036  boot
+  22          921600         1052671   64.0 MiB    A025  recovery
+  23         1052672         1054719   1024.0 KiB  A03A  devinfo
+  24         1054720         7346175   3.0 GiB     A038  system
+  25         7471104         7995391   256.0 MiB   A039  cache
+  26         7995392         8060927   32.0 MiB    A026  persist
+  27         8060928         8062975   1024.0 KiB  A01F  misc
+  28         8062976         8063999   512.0 KiB   A02D  keystore
+  29         8064000         8064063   32.0 KiB    FFFF  config
+  30         8064064         8588351   256.0 MiB   FFFF  oem
+  31         8650752         8650815   32.0 KiB    A040  limits
+  32         8781824         8782847   512.0 KiB   0700  mota
+  33         8782848         8784895   1024.0 KiB  FFFF  dip
+  34         8784896         8850431   32.0 MiB    FFFF  mdtp
+  35         8850432         8851455   512.0 KiB   A018  syscfg
+  36         8851456         8859647   4.0 MiB     0700  mcfg
+  37         8912896         8913151   128.0 KiB   FFFF  lksecapp
+  38         8913152         8913407   128.0 KiB   FFFF  lksecappbak
+  39         8913408         8913919   256.0 KiB   FFFF  cmnlib
+  40         8913920         8914431   256.0 KiB   FFFF  cmnlibbak
+  41         8914432         8914943   256.0 KiB   FFFF  cmnlib64
+  42         8914944         8915455   256.0 KiB   FFFF  cmnlib64bak
+  43         8915456         8915967   256.0 KiB   FFFF  keymaster
+  44         8915968         8916479   256.0 KiB   FFFF  keymasterbak
+  45         9043968         9044479   256.0 KiB   A022  apdp
+  46         9044480         9044991   256.0 KiB   A023  msadp
+  47         9044992         9045007   8.0 KiB     A024  dpo
+  48         9045008        10748943   832.0 MiB   A03A  cust
+  49        10748944       122142686   53.1 GiB    A03A  userdata

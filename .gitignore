@@ -2,7 +2,7 @@
 result
 result-*
 *.img
-/lk2nd
+*.log
 
 # Local overrides
 local.nix
