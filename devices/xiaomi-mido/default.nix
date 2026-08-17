@@ -120,6 +120,10 @@ in
     # hatch to shut the device down.
     services.logind.settings.Login.HandlePowerKeyLongPress = "poweroff";
 
+    # Use the schedutil CPU frequency governor instead of the kernel default
+    # (performance). Applied via the cpufreq oneshot at multi-user.target.
+    powerManagement.cpuFreqGovernor = "schedutil";
+
     networking.modemmanager.enable = true;
 
     systemd.services.ModemManager = {

@@ -1,21 +1,20 @@
-{ lib, fetchurl, runCommand }:
+{ lib, fetchurl, runCommand, linux-firmware }:
 
 # Adreno 506 firmware for mido, mirroring what postmarketOS ships
 # (`firmware-xiaomi-mido`).
 #
-# The ZAP (shader/secure-mode) firmware comes from the OEM firmware dump kept in
-# Kiciuk/proprietary_firmware_mido at the same commit postmarketOS pins; the
-# Adreno 506 microcode (a530_pm4.fw / a530_pfp.fw) is the generic A5xx
-# microcode that the msm driver looks up under `qcom/` and is shipped by
-# mainline linux-firmware.
+# The generic A5xx microcode (a530_pm4.fw / a530_pfp.fw) that the msm driver
+# looks up under `qcom/` is taken straight from `pkgs.linux-firmware` (which
+# carries the 2020-09-08 updated PFP microcode fixing GPU bugs, and is kept
+# current by NixOS itself), so no manual pinning/fetching is needed.
+#
+# The ZAP (shader/secure-mode) firmware is mido-specific and absent from
+# linux-firmware, so it comes from the OEM firmware dump kept in
+# Kiciuk/proprietary_firmware_mido at the same commit postmarketOS pins.
 let
   commit = "bc001cbb255a0ded2b58af07b93f712cd9322483";
   zap = file: sha256: fetchurl {
     url = "https://raw.githubusercontent.com/Kiciuk/proprietary_firmware_mido/${commit}/apnhlos/${file}";
-    inherit sha256;
-  };
-  lf = file: sha256: fetchurl {
-    url = "https://raw.githubusercontent.com/thesofproject/linux-firmware/master/qcom/${file}";
     inherit sha256;
   };
 in
@@ -27,8 +26,8 @@ runCommand "xiaomi-mido-firmware" {
      $out/lib/firmware/qcom/a506_zap.mdt
   cp ${zap "a506_zap.b02" "fe8dead286927c662da0769589c739f914c130271429701606bd7662e91930fd"} \
      $out/lib/firmware/qcom/a506_zap.b02
-  cp ${lf "a530_pm4.fw" "6419f35956ec7307af83723fedfba752520bacd8389eda0d0120e185e4cb1d3f"} \
+  cp ${linux-firmware}/lib/firmware/qcom/a530_pm4.fw \
      $out/lib/firmware/qcom/a530_pm4.fw
-  cp ${lf "a530_pfp.fw" "ed2c860ae56c5061d630b40cbe0aae6b0c4c4d0422b91b838973fbee66a3b00e"} \
+  cp ${linux-firmware}/lib/firmware/qcom/a530_pfp.fw \
      $out/lib/firmware/qcom/a530_pfp.fw
 ''

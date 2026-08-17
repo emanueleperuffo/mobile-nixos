@@ -1,6 +1,10 @@
 { config, lib, pkgs, ... }:
 
 {
+  imports = [
+    ./sound.nix
+  ];
+
   mobile.hardware = {
     soc = "qualcomm-msm8953";
     # The msm8953-mainline family spans Snapdragon 625/450/632 devices with
@@ -18,8 +22,25 @@
 
   mobile.kernel.structuredConfig = [
     (helpers: with helpers; {
-      CC_OPTIMIZE_FOR_PERFORMANCE = no;
-      CC_OPTIMIZE_FOR_SIZE = yes;
+      # PMI8950 fuel gauge driver (binds qcom,pmi8996-fg -> mido's
+      # fuel-gauge@4000) exposes battery capacity/voltage/current/temp.
+      BATTERY_PMI8994_FG = yes;
+
+      # Vibrator: mido's &pmi8950_haptics is enabled in the DT, so the
+      # Qualcomm SPMI haptics driver must be built or there is no haptic
+      # feedback (vibrations on tap/etc.).
+      INPUT_QCOM_SPMI_HAPTICS = yes;
+
+      # IR blaster: mido has a pwm-ir-tx node (used as a TV/remote
+      # transmitter). It needs the RC core + LIRC (raw IR userland, a
+      # dependency of IR_PWM_TX). The PWM itself is provided by the LPG
+      # driver (qcom,pmi8950-pwm) which is already enabled as a module.
+      # RC_DEVICES is the menu that contains IR_PWM_TX; without it oldconfig
+      # drops the transmitter symbol.
+      RC_CORE = yes;
+      RC_DEVICES = yes;
+      LIRC = yes;
+      IR_PWM_TX = yes;
     })
   ];
 
