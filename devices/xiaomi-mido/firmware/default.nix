@@ -21,11 +21,16 @@ in
 runCommand "xiaomi-mido-firmware" {
   meta.license = lib.licenses.unfreeRedistributableFirmware;
 } ''
-  mkdir -p $out/lib/firmware/qcom
+  # The msm driver resolves the ZAP path from the DT `firmware-name` property
+  # (qcom/msm8953/xiaomi/mido/a506_zap.mdt), so the ZAP files MUST live at that
+  # exact path under /lib/firmware, not at the bare qcom/ prefix. The a530
+  # microcode is looked up by hardcoded name (qcom/a530_*.fw).
+  mkdir -p $out/lib/firmware/qcom/msm8953/xiaomi/mido
   cp ${zap "a506_zap.mdt" "d0de0d49b2a24009f939dff77094d2628e272c04b86de0ebe49db508fe6d0967"} \
-     $out/lib/firmware/qcom/a506_zap.mdt
+     $out/lib/firmware/qcom/msm8953/xiaomi/mido/a506_zap.mdt
   cp ${zap "a506_zap.b02" "fe8dead286927c662da0769589c739f914c130271429701606bd7662e91930fd"} \
-     $out/lib/firmware/qcom/a506_zap.b02
+     $out/lib/firmware/qcom/msm8953/xiaomi/mido/a506_zap.b02
+  mkdir -p $out/lib/firmware/qcom
   cp ${linux-firmware}/lib/firmware/qcom/a530_pm4.fw \
      $out/lib/firmware/qcom/a530_pm4.fw
   cp ${linux-firmware}/lib/firmware/qcom/a530_pfp.fw \
