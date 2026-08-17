@@ -94,3 +94,26 @@ Modem support is still best-effort. `rmtfs` serves the modem's partition-backed
 region with `-P`; confirm `/dev/disk/by-partlabel/` contains `modemst1`,
 `modemst2`, `fsc` and `fsg`, and that ModemManager detects the modem. Voice
 calls (`q6voiced`) are not wired up yet.
+
+=== Virtualization (KVM)
+
+KVM is a dead end on mido — the hardware supports it (the Cortex-A53 cores have
+EL2), and the msm8953-mainline kernel even ships with `CONFIG_KVM=y`, but the
+firmware blocks it in a way that cannot be worked around:
+
+- The Qualcomm https://github.com/msm8916-mainline/qhypstub[qhypstub] project
+  (which makes EL2 usable on Snapdragon 410/615 by replacing the proprietary
+  `hyp` firmware) https://github.com/msm8916-mainline/qhypstub/issues/10[does
+  not work on MSM8953]: unlike MSM8916/MSM8939 there is *no separate `hyp`
+  partition* on msm8953 — the hypervisor functionality is embedded in the
+  `tz` (EL3) firmware.
+- Confirmed for mido: the partition table (`partitions_64GB.gdisk`) only has
+  `sbl1` and `tz` — no `hyp`. The qhypstub author's advice is to check for a
+  `hyp` partition; mido does not have one (https://github.com/msm8916-mainline/qhypstub/issues/4[same
+  finding for the Redmi 6 Pro]).
+- Getting EL2 would require reverse-engineering and *modifying the signed TZ
+  firmware* itself — a different class of project from qhypstub (and one with
+  brick/EDL-recovery risk).
+
+If you need virtualization, use an MSM8916/MSM8939 device, where qhypstub is a
+known-working path.
