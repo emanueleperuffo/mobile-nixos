@@ -6,12 +6,18 @@
 # GPU/panel/touchscreen firmware, Wi-Fi and modem for you) and enables the
 # user-facing hardware services (audio, Bluetooth, sensors).
 #
-# The extlinux boot flow is handled entirely by the device definition:
-#   - boots via lk2nd scanning the `system` partition for
-#     `/extlinux/extlinux.conf`
+# The boot flow is handled entirely by the device definition:
+#   - flashes via `fastboot` using lk2nd (mobile.system.android.flashingMethod = "lk2nd")
+#   - a raw `boot.img` (kernel + initrd + appended DTB) is installed on the
+#     stock Android `system` partition (too large for the `boot` partition)
 #   - root filesystem lives on the `userdata` partition
 #     (mobile.system.android.system_partition_destination = "userdata")
-#   - `/boot` is the ext2 boot filesystem on the `system` partition
+#
+# Build the images on a desktop with:
+#   nix-build -A outputs.android.android-fastboot-images --argstr device xiaomi-mido
+# then flash with:
+#   fastboot flash system result/boot.img
+#   fastboot flash userdata result/system.img
 #
 # The device already enables: NetworkManager + iwd (Wi-Fi), ModemManager
 # (cellular), and the DRM/GPU/panel/touchscreen/backlight kernel modules.
