@@ -114,6 +114,13 @@ in
     mobile.boot.stage-1.ssh.enable = true;
     mobile.boot.stage-1.networking.enable = true;
 
+    # DPMS tool to power the display panel on/off from the CLI (no compositor
+    # needed). Useful on mido, which often boots to a console rather than phosh.
+    environment.systemPackages = with pkgs; [
+      dpms
+      libdrm
+    ];
+
     networking.networkmanager = {
       enable = true;
       wifi.backend = "iwd";
