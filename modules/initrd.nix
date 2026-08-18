@@ -268,7 +268,7 @@ in
           Additional shell commands to run before the actual init.
 
           Prefer writing a task. This should be used mainly to redirect logging,
-          or do setup that is otherwise impossible in the init, like running it
+          or do setup that is otherwise impossible in the init, like running it 
           against strace.
         '';
         internal = true;
@@ -319,7 +319,6 @@ in
 
     config = mkIf config.mobile.boot.stage-1.enable {
       boot.initrd.enable = false;
-      boot.initrd.systemd.enable = false;
 
       # This isn't even used in our initrd...
       boot.supportedFilesystems = lib.mkOverride 10 [ ];
