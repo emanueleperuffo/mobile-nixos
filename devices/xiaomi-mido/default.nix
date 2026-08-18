@@ -102,65 +102,13 @@ in
       "uinput"              # virtual input devices (mido-navkeys)
     ];
 
-    mobile.boot.stage-1.extraUtils = with pkgs; [
-      gptfdisk
-    ];
-
-    # SSH server in the initrd, reachable over the USB RNDIS gadget.
-    # WARNING: initrd-ssh.nix clears the root password and starts dropbear with
-    # empty-password login and no key auth. It exists as a bring-up/debug tool;
-    # anyone with physical USB access gets root. Remove this once debugging is
-    # done (it only takes effect after a boot.img rebuild + reflash).
-    mobile.boot.stage-1.ssh.enable = true;
-    mobile.boot.stage-1.networking.enable = true;
-
-    # DPMS tool to power the display panel on/off from the CLI (no compositor
-    # needed). Useful on mido, which often boots to a console rather than phosh.
-    environment.systemPackages = with pkgs; [
-      dpms
-      libdrm
-    ];
-
-    networking.networkmanager = {
-      enable = true;
-      wifi.backend = "iwd";
-    };
+    networking.networkmanager.wifi.backend = "iwd";
 
     # Power button short-press is ignored: binding it to suspend caused a hang
     # (watchdog reset) on this kernel, while a manual `systemctl suspend`
     # suspends/resumes reliably. Sleep with `systemctl suspend`, wake with the
     # power button.
     services.logind.settings.Login.HandlePowerKey = "ignore";
-    # Long-press power keeps the logind default (poweroff) — an explicit escape
-    # hatch to shut the device down.
-    services.logind.settings.Login.HandlePowerKeyLongPress = "poweroff";
-
-    # Use the schedutil CPU frequency governor instead of the kernel default
-    # (performance). Applied via the cpufreq oneshot at multi-user.target.
-    powerManagement.cpuFreqGovernor = "schedutil";
-
-    # -- Display backlight / screen controls (manual, over adb/shell) --
-    # mido drives the panel through DRM (msm), so `/sys/class/graphics/fb0/blank`
-    # is only the legacy fbdev shim and is NOT wired to the real display
-    # (it may read 4/powerdown while the screen is visibly on). Ignore it.
-    #
-    # The backlight sysfs device on mido is `backlight`; it is the actual
-    # visible-brightness control and the reliable way to blank the screen.
-    #
-    # Lower brightness (set an absolute value out of max_brightness):
-    #   cat /sys/class/backlight/backlight/max_brightness
-    #   echo 50 | tee /sys/class/backlight/backlight/brightness
-    #
-    # Turn the screen off (backlight to 0):
-    #   echo 0 | tee /sys/class/backlight/backlight/brightness
-    # Back on (restore a value <= max_brightness):
-    #   cat /sys/class/backlight/backlight/max_brightness
-    #   echo 200 | tee /sys/class/backlight/backlight/brightness
-    #
-    # Sleep (screen off + low power, wake with the power button):
-    #   systemctl suspend
-
-    networking.modemmanager.enable = true;
 
     systemd.services.ModemManager = {
       # ModemManager is otherwise only D-Bus-activated; pull it into normal
