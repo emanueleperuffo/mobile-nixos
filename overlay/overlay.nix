@@ -74,9 +74,9 @@ in
     # SocketBindAllow=, RestrictFileSystems=, BPFProgram=); seccomp-based
     # restrictions still work and firewalling uses nftables/iptables, so this
     # is a safe no-op for the default build.
-    systemd = super.systemd.override {
-      withLibBPF = false;
-    };
+    # TODO: check if we need it systemd = super.systemd.override {
+    #   withLibBPF = false;
+    # };
 
     #
     # Fixes to upstream
