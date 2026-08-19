@@ -19,10 +19,24 @@ let
 
   # Wi-Fi configuration file, taken from the LineageOS mido device tree. The
   # prima/WCNSS driver and wcn36xx expect this alongside the WLAN NV blob.
-  wcnssCfg = pkgs.fetchurl {
-    url = "https://raw.githubusercontent.com/LineageOS/android_device_xiaomi_mido/cm-14.1/wifi/WCNSS_qcom_cfg.ini";
-    sha256 = "1678w9zw43kf0nl2hfvsgn8srram8f027hhhs4nkg4c1n31r12wa";
-  };
+  #
+  # The file is chip-generic (any device with the same WCNSS chip works), not
+  # board-specific, and it is a small redistributable text config — so it is
+  # shipped from the Nix store rather than loaded from a device partition.
+  # (mido has no `vendor` partition; on stock Android this file lived inside
+  # `/system/vendor`, and `system` is repurposed for boot here.)
+  #
+  # BMPS (battery-minded power-save) is disabled: the mainline wcn36xx driver
+  # does not implement the BMPS handshake, and leaving it enabled can leave
+  # the WLAN chip unresponsive until reboot.
+  wcnssCfg = pkgs.runCommand "WCNSS_qcom_cfg.ini" {
+    src = pkgs.fetchurl {
+      url = "https://raw.githubusercontent.com/LineageOS/android_device_xiaomi_mido/cm-14.1/wifi/WCNSS_qcom_cfg.ini";
+      sha256 = "1678w9zw43kf0nl2hfvsgn8srram8f027hhhs4nkg4c1n31r12wa";
+    };
+  } ''
+    sed 's/^gEnableBmps=1$/gEnableBmps=0/' "$src" > $out
+  '';
 in
 {
   options.mobile.quirks.qualcomm.msm8953-modem.enable = mkOption {
