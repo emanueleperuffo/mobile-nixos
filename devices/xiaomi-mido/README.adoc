@@ -65,7 +65,9 @@ The Adreno 506 ZAP shader firmware (`a506_zap.mdt` / `a506_zap.b02`) is bundled 
 
 The proprietary firmware is *not* bundled into the image. Instead, the stock
 `modem` (FAT16) and `persist` (ext4) partitions are mounted read-only at boot
-and exposed to the kernel through `firmware_class.path=/run/firmware` (see
+below `/mnt` (mounted by the stage-1 init, which creates the mountpoints) and
+copied into `/lib/firmware` — the kernel's default firmware search path, so no
+`firmware_class.path` kernel parameter is needed (see
 `modules/quirks/qualcomm/msm8953-modem.nix`).
 
 No manual copy is needed, but make sure those partitions exist and still
