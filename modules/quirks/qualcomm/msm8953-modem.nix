@@ -5,11 +5,12 @@
 #
 # The proprietary firmware is NOT embedded in the image. Instead the stock
 # `modem` (FAT16) and `persist` (ext4) partitions are mounted read-only at
-# boot (mounted below /mnt by the stage-1 init, which creates the mountpoints)
-# and copied into /lib/firmware, the kernel's default firmware search path.
+# boot (mounted below /run/mnt by the stage-1 init, which creates the
+# mountpoints) and copied into /lib/firmware, the kernel's default firmware
+# search path.
 #
-#   modem partition  -> /mnt/modem/image/*   (modem.mdt, wcnss.mdt, adsp.mdt, ...)
-#   persist partition-> /mnt/persist/         (WCNSS_qcom_wlan_nv.bin, ...)
+#   modem partition  -> /run/mnt/modem/image/*   (modem.mdt, wcnss.mdt, adsp.mdt, ...)
+#   persist partition-> /run/mnt/persist/         (WCNSS_qcom_wlan_nv.bin, ...)
 #
 # Only `WCNSS_qcom_cfg.ini` (a small, redistributable config) is provided from
 # the Nix store; everything else stays on the device's own partitions.
@@ -48,7 +49,7 @@ in
       WCNSS/wcn36xx and the cellular modem).
 
       Mounts the stock `modem` and `persist` partitions read-only (below
-      `/mnt`, at boot) and copies their firmware into `/lib/firmware`, then
+      `/run/mnt`, at boot) and copies their firmware into `/lib/firmware`, then
       runs the modem userspace stack (qrtr, rmtfs).
 
       The firmware is loaded from the device's own partitions at runtime; it is
@@ -58,14 +59,14 @@ in
 
   config = mkIf cfg.enable {
     # Mounted very early (stage-1); the stage-1 init creates the mountpoints
-    # (including /mnt) before mounting.
+    # (including /run/mnt) before mounting.
     boot.specialFileSystems = {
-      "/mnt/modem" = {
+      "/run/mnt/modem" = {
         device = "/dev/disk/by-partlabel/modem";
         fsType = "vfat";
         options = [ "ro" "nosuid" "noexec" "nodev" ];
       };
-      "/mnt/persist" = {
+      "/run/mnt/persist" = {
         device = "/dev/disk/by-partlabel/persist";
         fsType = "ext4";
         options = [ "ro" "nosuid" "noexec" "nodev" ];
@@ -94,10 +95,10 @@ in
           #   WCNSS_qcom_wlan_nv.bin, ...                 -> /lib/firmware/wlan/prima/
           mkdir -p "$FW/wlan/prima"
           for f in wcnss modem mba adsp; do
-            cp -a "/mnt/modem/image/$f"* "$FW/" 2>/dev/null || true
+            cp -a "/run/mnt/modem/image/$f"* "$FW/" 2>/dev/null || true
           done
-          cp -a "/mnt/persist/WCNSS_qcom_wlan_nv.bin"    "$FW/wlan/prima/"
-          cp -a "/mnt/persist/WCNSS_wlan_dictionary.dat" "$FW/wlan/prima/"
+          cp -a "/run/mnt/persist/WCNSS_qcom_wlan_nv.bin"    "$FW/wlan/prima/"
+          cp -a "/run/mnt/persist/WCNSS_wlan_dictionary.dat" "$FW/wlan/prima/"
           cp -a ${wcnssCfg} "$FW/wlan/prima/WCNSS_qcom_cfg.ini"
 
           # (Re)load the remoteproc drivers and wcn36xx now that the firmware is
