@@ -102,6 +102,157 @@ in
       "uinput"              # virtual input devices (mido-navkeys)
     ];
 
+    # Hardware/features that can never be used on mido, dropped from the
+    # kernel to save build time and image size. Every entry was checked
+    # against the mido device tree (msm8953-xiaomi-mido.dts / -common.dtsi):
+    # either the hardware is absent, or the DT node is disabled.
+    mobile.kernel.structuredConfig = [
+      (helpers: with helpers; {
+        # --- CPU/memory virtualization ---
+        # The signed TZ firmware keeps the CPU at EL1 (no separate `hyp`
+        # partition to replace on msm8953), so KVM and the VIRTIO devices it
+        # needs can never work. See the README's "Virtualization (KVM)".
+        KVM = no;
+        VIRTIO = no;
+
+        # --- USB ---
+        NFC = no;   # mido has no NFC chip (Redmi Note 4)
+        TYPEC = no; # micro-USB port, not Type-C
+
+        # --- Display panels ---
+        # The msm8953-mainline kernel builds generated DSI panel drivers for
+        # every device in the family (Asus, Huawei, Motorola, ...). mido only
+        # ships with the five `DRM_PANEL_XIAOMI_*` options loaded in stage-1
+        # (left enabled); everything else matches a different phone. NOTE: the
+        # mido panel node uses the placeholder compatible "xiaomi,mido-panel"
+        # that no driver matches, so the display is currently driven by the
+        # simple-framebuffer handed over by lk2nd.
+        DRM_PANEL_MSM8953_GENERATED = no;
+        DRM_PANEL_ASUS_ZE520KL_ILI7807B_BOE = no;
+        DRM_PANEL_ASUS_ZE520KL_R63350_TM = no;
+        DRM_PANEL_ASUS_ZE552KL_ILI7807B_CTC = no;
+        DRM_PANEL_ASUS_ZE552KL_NT35596_TXD = no;
+        DRM_PANEL_ASUS_ZE552KL_OTM1901A_LCE = no;
+        DRM_PANEL_ASUS_ZE552KL_R63350_TM = no;
+        DRM_PANEL_BILLION_RIMOB_NT35532_CS = no;
+        DRM_PANEL_BOE_BS052FHM_A00_6C01 = no;
+        DRM_PANEL_BOE_TV101WUM_LL2 = no;
+        DRM_PANEL_EDP = no;
+        DRM_PANEL_HIMAX_HX8399C_FHDPLUS = no;
+        DRM_PANEL_HUAWEI_MILAN_BOE_OTM1906C = no;
+        DRM_PANEL_HUAWEI_MILAN_BOE_TD4322 = no;
+        DRM_PANEL_HUAWEI_MILAN_BOE_TEST1906C = no;
+        DRM_PANEL_HUAWEI_MILAN_CTC_NT35596S = no;
+        DRM_PANEL_HUAWEI_MILAN_CTC_OTM1906C = no;
+        DRM_PANEL_HUAWEI_MILAN_JDI_R63452 = no;
+        DRM_PANEL_HUAWEI_MILAN_TIANMA_FIC8736 = no;
+        DRM_PANEL_HUAWEI_MILAN_TIANMA_FOCAL8716 = no;
+        DRM_PANEL_HUAWEI_MILAN_TIANMA_OTM1906C = no;
+        DRM_PANEL_LENOVO_CD_18781Y_FT8201 = no;
+        DRM_PANEL_LENOVO_CD_18781Y_HX83100A = no;
+        DRM_PANEL_LENOVO_KUNTAO_549 = no;
+        DRM_PANEL_LVDS = no;
+        DRM_PANEL_MDSS_FT8716_FHD = no;
+        DRM_PANEL_MDSS_ILI7807_FHD = no;
+        DRM_PANEL_MDSS_ILI7807_FHDPLUS = no;
+        DRM_PANEL_MDSS_NT35596_EBBG = no;
+        DRM_PANEL_MDSS_OTM1911_FHD = no;
+        DRM_PANEL_MDSS_OTM1911_FHDPLUS = no;
+        DRM_PANEL_MDSS_R63350 = no;
+        DRM_PANEL_MOTOROLA_ALI_BOE = no;
+        DRM_PANEL_MOTOROLA_ALI_TIANMA = no;
+        DRM_PANEL_MOTOROLA_OCEAN_622_OFILM = no;
+        DRM_PANEL_MOTOROLA_OCEAN_622_TIANMA = no;
+        DRM_PANEL_MOTOROLA_OCEAN_NT36672A_CSOT = no;
+        DRM_PANEL_MOTOROLA_RIVER_624_BOE = no;
+        DRM_PANEL_MOTOROLA_RIVER_624_TIANMA = no;
+        DRM_PANEL_MOTOROLA_RIVER_HX83112B_TIANMA = no;
+        DRM_PANEL_MOTOROLA_RIVER_NT36672A_TIANMA = no;
+        DRM_PANEL_SAMSUNG_GTA2XL_HX8279_TV101WUM = no;
+        DRM_PANEL_SAMSUNG_S6E3FA7 = no;
+        DRM_PANEL_SAMSUNG_S6E3FA7_AMS604NL01 = no;
+        DRM_PANEL_TENOR_HX8399C_AUO = no;
+        DRM_PANEL_TENOR_ILI7807D_DJN_AUO = no;
+        DRM_PANEL_TENOR_ILI7807D_DJN = no;
+        DRM_PANEL_TIANMA_TL052VDXP02 = no;
+        DRM_PANEL_VSMART_CASUARINA_FT8006P_HLT = no;
+        DRM_PANEL_VSMART_CASUARINA_FT8006P_TRULY = no;
+        DRM_PANEL_VSMART_CASUARINA_ICNL9911S_BYD = no;
+        DRM_PANEL_XIAOMI_NT36672_CSOT_FHDPLUS_E7 = no;
+        DRM_PANEL_XIAOMI_NT36672_TIANMA_FHDPLUS_E7 = no;
+        DRM_PANEL_XIAOMI_ONCLITE_HX8394F = no;
+        DRM_PANEL_XIAOMI_ONCLITE_ILI9881 = no;
+        DRM_PANEL_XIAOMI_ONCLITE_OTM1901A = no;
+        DRM_PANEL_XIAOMI_OXYGEN_R61322_AUO = no;
+        DRM_PANEL_XIAOMI_OXYGEN_R63350_TIANMA = no;
+        DRM_PANEL_XIAOMI_ROSY_FT8006M_BOE = no;
+        DRM_PANEL_XIAOMI_ROSY_FT8613_CSOT = no;
+        DRM_PANEL_XIAOMI_ROSY_FT8613_EBBG = no;
+        DRM_PANEL_XIAOMI_TD4310_EBBG_FHDPLUS_E7 = no;
+        DRM_PANEL_XIAOMI_TD4310_FHDPLUS_E7_G55 = no;
+        DRM_PANEL_XIAOMI_TD4310_FHDPLUS_E7 = no;
+        DRM_PANEL_XIAOMI_YSL_HX8394F = no;
+        DRM_PANEL_XIAOMI_YSL_ILI7807D = no;
+        DRM_PANEL_XIAOMI_YSL_ILI9881C = no;
+
+        # --- Cameras ---
+        # mido's only camera sensor (samsung,s5k3l8) has no driver in this
+        # kernel at all, so the whole camera path is dead weight: disable the
+        # camera ISP, video encoder and the sensors fitted to *other* phones
+        # in the family. Re-enable VIDEO_QCOM_CAMSS/VENUS when a s5k3l8 (or
+        # any mido) camera driver lands.
+        VIDEO_QCOM_CAMSS = no;
+        VIDEO_QCOM_VENUS = no;
+        VIDEO_SR556 = no;
+        VIDEO_IMX219 = no;
+        VIDEO_OV5645 = no;
+        VIDEO_OV5670 = no;
+        VIDEO_OV5675 = no;
+        VIDEO_OV5695 = no;
+        VIDEO_S5K2XX = no;
+
+        # --- Sensors (IIO) ---
+        # mido's i2c-gpio bitbanged bus has BMI160 (accel/gyro), LSM6DS3
+        # (st,lsm6ds3 -> IIO_ST_LSM6DSX) and LTRF216A (light) — all kept.
+        # The ones below are light/magnetometer sensors of other devices.
+        LTR501 = no;
+        STK3310 = no;
+        AK8975 = no;
+        AK09911 = no;
+
+        # --- Audio codecs ---
+        # mido uses the QDSP6 path with the msm8916 WCD codec (wcd_codec +
+        # lpass_codec nodes are enabled) and the awinic,aw8738 speaker amp —
+        # all kept. Freescale/i.MX codecs are for NXP SoCs, and the rest are
+        # amps/codecs fitted to other devices. The max98927 node (audio-
+        # codec@3a) is disabled in the common dtsi and never enabled.
+        SND_SOC_FSL_ASRC = no;
+        SND_SOC_FSL_SAI = no;
+        SND_SOC_FSL_AUDMIX = no;
+        SND_SOC_FSL_SSI = no;
+        SND_SOC_FSL_SPDIF = no;
+        SND_SOC_FSL_ESAI = no;
+        SND_SOC_FSL_MICFIL = no;
+        SND_SOC_FSL_EASRC = no;
+        SND_SOC_FSL_UTILS = no;
+        SND_SOC_IMX_AUDMUX = no;
+        SND_SOC_MAX98927 = no;
+        SND_SOC_HDMI_CODEC = no;
+        SND_SOC_SIMPLE_AMPLIFIER = no;
+        SND_SOC_SIMPLE_MUX = no;
+        SND_SOC_SPDIF = no;
+        SND_SOC_TFA9872 = no;
+        SND_SOC_WM8978 = no;
+
+        # --- Input ---
+        # The Synaptics RMI4 node (touchscreen@20) is disabled in the common
+        # dtsi and never enabled — mido's controllers are FocalTech (edt-
+        # ft5406) or Goodix (gt917d), both kept.
+        RMI4_CORE = no;
+        RMI4_I2C = no;
+      })
+    ];
+
     networking.networkmanager.wifi.backend = "iwd";
 
     # Power button short-press is ignored: binding it to suspend caused a hang
