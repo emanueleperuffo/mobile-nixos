@@ -16,7 +16,9 @@
   };
 
   mobile.boot.stage-1.kernel = {
-    package = (pkgs.callPackage ./kernel { });
+    # mkDefault so devices can point the family kernel at their own config
+    # (e.g. xiaomi-mido uses a trimmed per-device config.aarch64).
+    package = lib.mkDefault (pkgs.callPackage ./kernel { });
     modular = true;
   };
 
@@ -41,6 +43,9 @@
       RC_DEVICES = yes;
       LIRC = yes;
       IR_PWM_TX = yes;
+
+      CC_OPTIMIZE_FOR_PERFORMANCE = no;
+      CC_OPTIMIZE_FOR_SIZE = yes;
     })
   ];
 

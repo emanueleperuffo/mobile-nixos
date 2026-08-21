@@ -55,6 +55,12 @@ in
   ];
 
   config = {
+    # mido uses its own kernel config (devices/xiaomi-mido/kernel/config.aarch64)
+    # instead of the family's, so the trims can live per-device.
+    mobile.boot.stage-1.kernel.package = (pkgs.callPackage ../families/msm8953-mainline/kernel { }).overrideAttrs {
+      configfile = ./kernel/config.aarch64;
+    };
+
     mobile.hardware.touchscreen = mkDefault "focaltech";
 
     mobile.device.name = "xiaomi-mido";
@@ -110,10 +116,12 @@ in
       (helpers: with helpers; {
         # --- CPU/memory virtualization ---
         # The signed TZ firmware keeps the CPU at EL1 (no separate `hyp`
-        # partition to replace on msm8953), so KVM and the VIRTIO devices it
-        # needs can never work. See the README's "Virtualization (KVM)".
+        # partition to replace on msm8953), so KVM can never work. See the
+        # README's "Virtualization (KVM)".
+        # NOTE: VIRTIO is *not* listed here even though KVM is off: the modem
+        # stack (REMOTEPROC/RPMSG for QRTR/GLINK) hard-selects the virtio bus
+        # core, so CONFIG_VIRTIO=y is forced on msm8953 regardless.
         KVM = no;
-        VIRTIO = no;
 
         # --- USB ---
         NFC = no;   # mido has no NFC chip (Redmi Note 4)
@@ -236,8 +244,9 @@ in
         SND_SOC_FSL_EASRC = no;
         SND_SOC_FSL_UTILS = no;
         SND_SOC_IMX_AUDMUX = no;
+        # SND_SOC_HDMI_CODEC is not listed here even though mido has no HDMI:
+        # DRM_MSM (the display driver) hard-selects it, so it stays built.
         SND_SOC_MAX98927 = no;
-        SND_SOC_HDMI_CODEC = no;
         SND_SOC_SIMPLE_AMPLIFIER = no;
         SND_SOC_SIMPLE_MUX = no;
         SND_SOC_SPDIF = no;
@@ -247,7 +256,10 @@ in
         # --- Input ---
         # The Synaptics RMI4 node (touchscreen@20) is disabled in the common
         # dtsi and never enabled — mido's controllers are FocalTech (edt-
-        # ft5406) or Goodix (gt917d), both kept.
+        # ft5406) or Goodix (gt917d), both kept. HID_RMI (RMI4 touchpads over
+        # i2c-hid/usbhid) must go too: it hard-selects RMI4_CORE, so the `no`
+        # below would otherwise be overridden back to `m`.
+        HID_RMI = no;
         RMI4_CORE = no;
         RMI4_I2C = no;
       })
