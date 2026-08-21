@@ -44,9 +44,7 @@ in
     # TODO: self-contained configuration of the gadget with gadget-tool here.
     systemd.services.adbd = {
       description = "ADB Daemon for stage-2";
-      # Also bring adbd up in emergency/rescue mode so the device stays
-      # reachable over adb even when a filesystem fails to mount.
-      wantedBy = [ "multi-user.target" "rescue.target" "emergency.target" ];
+      wantedBy = [ "multi-user.target" ];
       enable = true;
       script = ''
         ${pkgs.adbd}/bin/adbd &
