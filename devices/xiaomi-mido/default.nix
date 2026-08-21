@@ -114,15 +114,6 @@ in
     # either the hardware is absent, or the DT node is disabled.
     mobile.kernel.structuredConfig = [
       (helpers: with helpers; {
-        # --- CPU/memory virtualization ---
-        # The signed TZ firmware keeps the CPU at EL1 (no separate `hyp`
-        # partition to replace on msm8953), so KVM can never work. See the
-        # README's "Virtualization (KVM)".
-        # NOTE: VIRTIO is *not* listed here even though KVM is off: the modem
-        # stack (REMOTEPROC/RPMSG for QRTR/GLINK) hard-selects the virtio bus
-        # core, so CONFIG_VIRTIO=y is forced on msm8953 regardless.
-        KVM = no;
-
         # --- USB ---
         NFC = no;   # mido has no NFC chip (Redmi Note 4)
         TYPEC = no; # micro-USB port, not Type-C
@@ -231,19 +222,10 @@ in
         # --- Audio codecs ---
         # mido uses the QDSP6 path with the msm8916 WCD codec (wcd_codec +
         # lpass_codec nodes are enabled) and the awinic,aw8738 speaker amp —
-        # all kept. Freescale/i.MX codecs are for NXP SoCs, and the rest are
-        # amps/codecs fitted to other devices. The max98927 node (audio-
-        # codec@3a) is disabled in the common dtsi and never enabled.
-        SND_SOC_FSL_ASRC = no;
-        SND_SOC_FSL_SAI = no;
-        SND_SOC_FSL_AUDMIX = no;
-        SND_SOC_FSL_SSI = no;
-        SND_SOC_FSL_SPDIF = no;
-        SND_SOC_FSL_ESAI = no;
-        SND_SOC_FSL_MICFIL = no;
-        SND_SOC_FSL_EASRC = no;
-        SND_SOC_FSL_UTILS = no;
-        SND_SOC_IMX_AUDMUX = no;
+        # all kept. The entries below are amps/codecs fitted to *other*
+        # devices. The max98927 node (audio-codec@3a) is disabled in the
+        # common dtsi and never enabled. (Freescale/i.MX codecs are disabled
+        # family-wide in the msm8953-mainline device file.)
         # SND_SOC_HDMI_CODEC is not listed here even though mido has no HDMI:
         # DRM_MSM (the display driver) hard-selects it, so it stays built.
         SND_SOC_MAX98927 = no;
@@ -272,20 +254,6 @@ in
     # suspends/resumes reliably. Sleep with `systemctl suspend`, wake with the
     # power button.
     services.logind.settings.Login.HandlePowerKey = "ignore";
-
-    systemd.services.ModemManager = {
-      # ModemManager is otherwise only D-Bus-activated; pull it into normal
-      # boot so it is up and probing the QRTR modem on every start.
-      wantedBy = [ "multi-user.target" ];
-      after = [ "qrtr-ns.service" "rmtfs.service" "mobile-msm8953-firmware.service" ];
-      requires = [ "mobile-msm8953-firmware.service" ];
-      # The modem can take a moment to show up on QRTR after the remoteproc
-      # boots; keep retrying so ModemManager reliably comes up on every boot.
-      serviceConfig = {
-        Restart = "always";
-        RestartSec = "2s";
-      };
-    };
 
     # The FT5x06 touchscreen exposes the bottom capacitive nav-button strip as
     # ordinary touch coordinates (there are no real KEY_BACK/HOME/MENU events).

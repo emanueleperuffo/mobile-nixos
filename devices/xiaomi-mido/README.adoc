@@ -1,12 +1,6 @@
 = Xiaomi Redmi Note 4
 include::_support/common.inc[]
-//
-// DEV NOTE (not rendered): the full step-by-step build & flash instructions
-// are generated automatically from
-// modules/system-types/android/device-notes.lk2nd.adoc.erb and shown on the
-// rendered device page (see doc/_support/devices/generate-devices-listing.rb),
-// so do NOT duplicate a "Building and flashing" section here.
-//
+
 // Manual reference:
 //   $ nix-build --argstr device xiaomi-mido -A outputs.android-fastboot-images
 //   $ nix-build --argstr device xiaomi-mido -A pkgs.lk2ndMsm8953 -o result-lk2nd
@@ -14,19 +8,11 @@ include::_support/common.inc[]
 //   reboot to lk2nd fastboot (hold Volume Down while booting), then:
 //   $ fastboot flash userdata result/system.img
 //   $ fastboot flash recovery result/recovery.img
-//   reboot to Recovery mode, then via adb:
-//   ~ # mke2fs /dev/disk/by-partlabel/system
-//   ~ # mkdir /mnt2
-//   ~ # mount /dev/disk/by-partlabel/system /mnt2
-//   $ adb push result/boot.img /mnt2
-//   $ adb reboot
-//
-// These instructions require `adbd` to be enabled, e.g. add
-// `{ lib, ... }: { mobile.adbd.enable = true; }` to local.nix.
+//   $ fastboot flash system result/boot.img
 
 == Device-specific notes
 
-This device is part of the generic https://github.com/msm8953-mainline[msm8953-mainline] port, sharing the kernel and boot stack with the other Qualcomm MSM8953/SDM450/SDM632 devices.
+This device is part of the generic https://github.com/msm8953-mainline[msm8953-mainline] port, sharing the boot stack with the other Qualcomm MSM8953/SDM450/SDM632 devices.
 
 === Touchscreen
 
@@ -66,8 +52,7 @@ The Adreno 506 ZAP shader firmware (`a506_zap.mdt` / `a506_zap.b02`) is bundled 
 The proprietary firmware is *not* bundled into the image. Instead, the stock
 `modem` (FAT16) and `persist` (ext4) partitions are mounted read-only at boot
 below `/run/mnt` (mounted by the stage-1 init, which creates the mountpoints) and
-copied into `/lib/firmware` — the kernel's default firmware search path, so no
-`firmware_class.path` kernel parameter is needed (see
+copied into `/lib/firmware` — the kernel's default firmware search path (see
 `modules/quirks/qualcomm/msm8953-modem.nix`).
 
 No manual copy is needed, but make sure those partitions exist and still
@@ -91,11 +76,48 @@ managed by NetworkManager using the `iwd` backend:
 The modem runs on `qrtr-ns` and `rmtfs` (which shares the modem's EFS/NV
 region), and is managed by ModemManager through NetworkManager.
 
+ModemManager is *opt-in*: the device/family wires up the transport (`qrtr-ns`,
+`rmtfs`, the firmware copy) and shapes the ModemManager service (pulled into
+normal boot, restarting until the modem appears on QRTR), but does not start
+it. Activate it in your `configuration.nix`:
+
+```
+networking.modemmanager.enable = true;
+```
+
 [NOTE]
 Modem support is still best-effort. `rmtfs` serves the modem's partition-backed
 region with `-P`; confirm `/dev/disk/by-partlabel/` contains `modemst1`,
-`modemst2`, `fsc` and `fsg`, and that ModemManager detects the modem. Voice
-calls (`q6voiced`) are not wired up yet.
+`modemst2`, `fsc` and `fsg`, and that ModemManager detects the modem.
+
+=== Voice calls (`q6voiced`, opt-in)
+
+The kernel side (QDSP6 Q6Voice modules, the `q6voicedai` device-tree node) and
+userspace daemon (`pkgs.q6voiced`) are all in place, but voice calls are *not*
+enabled by default: the feature is untested on mido and depends on
+ModemManager's voice API. To try it, run the daemon as a service from your
+`configuration.nix`:
+
+```
+{ pkgs, ... }:
+{
+  systemd.services.q6voiced = {
+    description = "QDSP6 voice daemon";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "ModemManager.service" "qrtr-ns.service" ];
+    serviceConfig = {
+      ExecStart = "${pkgs.q6voiced}/bin/q6voiced";
+      Restart = "always";
+      RestartSec = "2";
+    };
+  };
+}
+```
+
+Check the actual binary name under `$out/bin/` after building, and drive calls
+through ModemManager's voice API (`mmcli -m 0 --voice ...`). If this proves out
+on real hardware, the service belongs in `devices/families/msm8953-mainline`
+so every device in the family gets it.
 
 === Virtualization (KVM)
 
@@ -116,6 +138,3 @@ firmware blocks it in a way that cannot be worked around:
 - Getting EL2 would require reverse-engineering and *modifying the signed TZ
   firmware* itself — a different class of project from qhypstub (and one with
   brick/EDL-recovery risk).
-
-If you need virtualization, use an MSM8916/MSM8939 device, where qhypstub is a
-known-working path.

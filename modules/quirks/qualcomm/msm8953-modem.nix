@@ -136,6 +136,22 @@ in
           RestartSec = "1";
         };
       };
+
+      # Shape ModemManager's behaviour *if* the owner activates it. MM is
+      # deliberately NOT enabled here (`networking.modemmanager.enable` is left
+      # to the device/owner): when they do enable it, this makes sure it is up
+      # early and probing the QRTR modem on every boot (it is otherwise only
+      # D-Bus-activated), and keeps retrying until the modem shows up after the
+      # remoteproc boots.
+      ModemManager = {
+        wantedBy = [ "multi-user.target" ];
+        after = [ "qrtr-ns.service" "rmtfs.service" "mobile-msm8953-firmware.service" ];
+        requires = [ "mobile-msm8953-firmware.service" ];
+        serviceConfig = {
+          Restart = "always";
+          RestartSec = "2s";
+        };
+      };
     };
   };
 }

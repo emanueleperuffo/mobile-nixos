@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ lib, pkgs, ... }:
 
 {
   imports = [
@@ -24,6 +24,27 @@
 
   mobile.kernel.structuredConfig = [
     (helpers: with helpers; {
+      # KVM can never work: the signed TZ firmware keeps the CPU at EL1 and
+      # msm8953 has no separate `hyp` partition to replace (see the mido
+      # README's "Virtualization (KVM)" — same finding for the whole platform,
+      # e.g. the Redmi 6 Pro). VIRTIO is intentionally not listed here: the
+      # modem stack (REMOTEPROC/RPMSG for QRTR/GLINK) hard-selects the virtio
+      # bus core, so CONFIG_VIRTIO=y is forced on msm8953 regardless.
+      KVM = no;
+
+      # Freescale/i.MX SoC audio: these codecs are for NXP SoCs and can never
+      # appear on an msm8953 device (platform audio is QDSP6 + WCD).
+      SND_SOC_FSL_ASRC = no;
+      SND_SOC_FSL_SAI = no;
+      SND_SOC_FSL_AUDMIX = no;
+      SND_SOC_FSL_SSI = no;
+      SND_SOC_FSL_SPDIF = no;
+      SND_SOC_FSL_ESAI = no;
+      SND_SOC_FSL_MICFIL = no;
+      SND_SOC_FSL_EASRC = no;
+      SND_SOC_FSL_UTILS = no;
+      SND_SOC_IMX_AUDMUX = no;
+
       # PMI8950 fuel gauge driver (binds qcom,pmi8996-fg -> mido's
       # fuel-gauge@4000) exposes battery capacity/voltage/current/temp.
       BATTERY_PMI8994_FG = yes;
