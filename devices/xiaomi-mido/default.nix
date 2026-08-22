@@ -278,24 +278,6 @@ in
     # partition. Keeping this in sync with the lk2nd install instructions.
     mobile.system.android.system_partition_destination = "userdata";
 
-    # The auto-computed rootfs size only accounts for content *bytes* (+ fudge
-    # + 20 MiB padding), but the system closure is inode-dense (~48k dirs +
-    # ~96k files), which overflows the default 1-inode-per-16 KiB ratio at the
-    # computed ~2.3 GiB (~144k inodes). Give the image a fixed size instead:
-    # 4 GiB yields ~262k inodes. It is flashed to the 52 GB `userdata`
-    # partition and grown on first boot, so the extra size is free.
-    #
-    # NOTE: this must be a whole-attrset `mkDefault`, NOT `rootfs.size = ...`:
-    # rootfs.nix provides the rootfs defaults wrapped in `lib.mkDefault`, and
-    # for attrsOf(submodule) options a nested definition at the default
-    # priority (e.g. `rootfs.size = ...`) wins the per-key merge and *drops the
-    # entire mkDefault'd attrset*, leaving `filesystem`/`label`/`populateCommands`
-    # undefined. Merging a sibling `mkDefault { size = ... }` at the same
-    # priority keeps both definitions.
-    mobile.generatedFilesystems.rootfs = mkDefault {
-      size = pkgs.image-builder.helpers.size.GiB 4;
-    };
-
     mobile.system.android.appendDTB = [
       patchedMidoDTB
     ];

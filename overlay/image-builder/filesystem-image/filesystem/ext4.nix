@@ -71,6 +71,11 @@ in
       blockSize = config.helpers.size.KiB 4;
       sectorSize = lib.mkDefault 512;
 
+      # make_ext4fs allocates 1 inode per 16 KiB of image size (for images
+      # >= 512 MiB). The inode-aware sizing in basic.nix uses this to floor
+      # the auto-computed size to the file/directory count.
+      inodeRatio = config.helpers.size.KiB 16;
+
       inherit minimumSize;
 
       computeMinimalSize = ''

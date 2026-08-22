@@ -10,6 +10,7 @@ let
   inherit (config)
     computeMinimalSize
     extraPadding
+    inodeRatio
     size
   ;
 in
@@ -77,6 +78,24 @@ in
       description = ''
         When size is computed automatically, how many bytes to add to the
         filesystem total size.
+      '';
+    };
+
+    inodeRatio = mkOption {
+      type = types.int;
+      internal = true;
+      default = 0;
+      description = ''
+        Filesystems with inode tables (ext4) allocate inodes in proportion to
+        the image size (make_ext4fs: 1 inode per 16 KiB). Set this to the
+        bytes-per-inode ratio of the filesystem so the auto-computed size also
+        accounts for the number of files and directories in the content.
+
+        Inode-dense contents (e.g. NixOS system closures: many small files and
+        directories) would otherwise exhaust inodes while the image still has
+        free space, failing the build with a `make_file: failed to allocate
+        inode` error. Filesystems without inode tables (squashfs, fat32,
+        btrfs) leave this at 0.
       '';
     };
 
@@ -286,6 +305,20 @@ in
         size=$((size * blockSize))
 
         ${computeMinimalSize}
+
+        # Filesystems with inode tables allocate inodes in proportion to the
+        # image size. The byte estimate above has no notion of file *counts*,
+        # so inode-dense contents can exhaust inodes while the image still has
+        # free space. Floor the size to what the inode count requires.
+        if (( ${toString inodeRatio} > 0 )); then
+          local inodes=$(find . | wc -l)
+          echo "Reserving $inodes inodes..." 1>&2
+          local inodeSize=$(( inodes * ${toString inodeRatio} ))
+          if (( inodeSize > size )); then
+            echo "WARNING: increasing size to ${toString inodeRatio} bytes/inode for $inodes inodes ($inodeSize bytes)." 1>&2
+            size=$inodeSize
+          fi
+        fi
 
         size=$(( size + ${toString extraPadding} ))
 
