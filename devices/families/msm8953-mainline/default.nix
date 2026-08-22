@@ -45,6 +45,88 @@
       SND_SOC_FSL_UTILS = no;
       SND_SOC_IMX_AUDMUX = no;
 
+      # --- Dead weight inherited from the generic upstream defconfig ---
+      # None of these can appear on an msm8953 device (verified against the
+      # device trees and the platform's hardware):
+      #  - server storage: SAS (RAID/HBA), UFS (msm8953 is eMMC-only)
+      #  - unused filesystems: btrfs/f2fs (rootfs is squashfs, data is ext4),
+      #    optical (iso9660/udf), 9p (VM share), fscache/cachefiles
+      #  - USB *host* stack: xhci/ehci (dwc3 is peripheral-only), mass storage,
+      #    serial adapters (incl. LTE dongles), ethernet dongles
+      #  - other vendors' PMICs: X-Powers AXP20X, HiSilicon HI6421, NVIDIA
+      #    MAX77620 (mido's PMICs are the Qualcomm SPMI ones)
+      #  - misc: DS3232 RTC, DisplayLink/UDL, LT8912B DSI->HDMI bridge (only
+      #    found on dev-boards like db845c), USB audio, ALSA MIDI sequencer,
+      #    ath10k (msm8953 Wi-Fi is wcn36xx), Speakup, NT sync (Wine),
+      #    IPv6-in-IPv4 sit tunnel, sensors/PMICs of other devices,
+      #    and the apq8016 DragonBoard machine driver (different SoC).
+      SCSI_SAS_ATTRS = no;
+      SCSI_SAS_LIBSAS = no;
+      SCSI_SAS_HOST_SMP = no;
+      SCSI_UFSHCD = no;
+      SCSI_UFSHCD_PLATFORM = no;
+      SCSI_UFS_QCOM = no;
+      F2FS_FS = no;
+      BTRFS_FS = no;
+      ISO9660_FS = no;
+      UDF_FS = no;
+      "9P_FS" = no;
+      FSCACHE = no;
+      CACHEFILES = no;
+      USB_XHCI_HCD = no;
+      USB_EHCI_HCD = no;
+      USB_STORAGE = no;
+      USB_SERIAL = no;
+      USB_NET_DRIVERS = no;
+      MFD_AXP20X = no;
+      MFD_HI6421_PMIC = no;
+      MFD_MAX77620 = no;
+      RTC_DRV_DS3232 = no;
+      DRM_UDL = no;
+      DRM_LONTIUM_LT8912B = no;
+      SND_USB_AUDIO = no;
+      SND_SEQUENCER = no;
+      SND_RAWMIDI = no;
+      SND_UMP = no;
+      SND_SEQ_UMP = no;
+      ATH10K = no;
+      SPEAKUP = no;
+      NTSYNC = no;
+      IPV6_SIT = no;
+      CM3323 = no;
+      YAMAHA_YAS530 = no;
+      MAX9611 = no;
+      SM5708_POWER = no;
+      SND_SOC_APQ8016_SBC = no;
+
+      # --- Fallout from the above: selectors and universal-default sub-options ---
+      # MFD_AXP20X_I2C selects the AXP20X core back to `y`; HID_PRODIKEYS
+      # (PC-MIDI keyboard) selects SND_RAWMIDI; MOUSE_PS2 (default-y, unpinned)
+      # selects SERIO. And the universal filesystems defaults expect the
+      # following sub-options to be `y`, which cannot hold once their parent is
+      # off — pin them off explicitly.
+      MFD_AXP20X_I2C = no;
+      HID_PRODIKEYS = no;
+      MOUSE_PS2 = no;
+      # The SERIO chain: HID_RMI (Synaptics RMI4 over i2c-hid/usbhid, dead on
+      # phones) selects RMI4_F03, which enables RMI4_F03_SERIO — and F03_SERIO
+      # ignores an explicit `=n` because its `default RMI4_CORE` beats the
+      # config file value, then selects SERIO back to `m`. Killing HID_RMI and
+      # RMI4_F03 (the PS/2-guest function, TrackPoint-style passthrough) breaks
+      # the chain so SERIO can stay off.
+      HID_RMI = no;
+      RMI4_F03 = no;
+      SERIO = no;
+      SERIO_AMBAKMI = no;
+      SERIO_LIBPS2 = no;
+      BTRFS_FS_POSIX_ACL = no;
+      F2FS_FS_COMPRESSION = no;
+      F2FS_FS_SECURITY = no;
+      "9P_FSCACHE" = no;
+      "9P_FS_POSIX_ACL" = no;
+      USB_EHCI_ROOT_HUB_TT = no;
+      USB_EHCI_TT_NEWSCHED = no;
+
       # PMI8950 fuel gauge driver (binds qcom,pmi8996-fg -> mido's
       # fuel-gauge@4000) exposes battery capacity/voltage/current/temp.
       BATTERY_PMI8994_FG = yes;

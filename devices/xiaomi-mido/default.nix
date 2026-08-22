@@ -193,6 +193,9 @@ in
         DRM_PANEL_XIAOMI_YSL_HX8394F = no;
         DRM_PANEL_XIAOMI_YSL_ILI7807D = no;
         DRM_PANEL_XIAOMI_YSL_ILI9881C = no;
+        # Non-generated drivers for other devices' panels/touch controllers:
+        DRM_PANEL_HIMAX_HX83112B = no;
+        TOUCHSCREEN_HIMAX_HX83112B = no;
 
         # --- Cameras ---
         # mido's only camera sensor (samsung,s5k3l8) has no driver in this
@@ -233,15 +236,16 @@ in
         SND_SOC_SIMPLE_MUX = no;
         SND_SOC_SPDIF = no;
         SND_SOC_TFA9872 = no;
+        SND_SOC_TFA989X = no; # separate symbol from TFA9872 (snd-soc-tfa989x.ko)
+        SND_SOC_AW8898 = no;  # other devices' amp (mido: awinic,aw8738)
         SND_SOC_WM8978 = no;
 
         # --- Input ---
         # The Synaptics RMI4 node (touchscreen@20) is disabled in the common
         # dtsi and never enabled — mido's controllers are FocalTech (edt-
-        # ft5406) or Goodix (gt917d), both kept. HID_RMI (RMI4 touchpads over
-        # i2c-hid/usbhid) must go too: it hard-selects RMI4_CORE, so the `no`
-        # below would otherwise be overridden back to `m`.
-        HID_RMI = no;
+        # ft5406) or Goodix (gt917d), both kept. (HID_RMI, the RMI4-over-HID
+        # touchpad driver, is disabled family-wide in the msm8953-mainline
+        # device file.)
         RMI4_CORE = no;
         RMI4_I2C = no;
       })
