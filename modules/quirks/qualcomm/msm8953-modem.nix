@@ -28,17 +28,12 @@ let
   # (mido has no `vendor` partition; on stock Android this file lived inside
   # `/system/vendor`, and `system` is repurposed for boot here.)
   #
-  # BMPS (battery-minded power-save) is disabled: the mainline wcn36xx driver
-  # does not implement the BMPS handshake, and leaving it enabled can leave
-  # the WLAN chip unresponsive until reboot.
-  wcnssCfg = pkgs.runCommand "WCNSS_qcom_cfg.ini" {
-    src = pkgs.fetchurl {
-      url = "https://raw.githubusercontent.com/LineageOS/android_device_xiaomi_mido/cm-14.1/wifi/WCNSS_qcom_cfg.ini";
-      sha256 = "1678w9zw43kf0nl2hfvsgn8srram8f027hhhs4nkg4c1n31r12wa";
-    };
-  } ''
-    sed 's/^gEnableBmps=1$/gEnableBmps=0/' "$src" > $out
-  '';
+  # The file is shipped unmodified from the LineageOS mido device tree (stock
+  # BMPS setting).
+  wcnssCfg = pkgs.fetchurl {
+    url = "https://raw.githubusercontent.com/LineageOS/android_device_xiaomi_mido/cm-14.1/wifi/WCNSS_qcom_cfg.ini";
+    sha256 = "1678w9zw43kf0nl2hfvsgn8srram8f027hhhs4nkg4c1n31r12wa";
+  };
 in
 {
   options.mobile.quirks.qualcomm.msm8953-modem.enable = mkOption {
