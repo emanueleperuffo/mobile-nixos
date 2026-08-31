@@ -1,13 +1,16 @@
-{ stdenv }:
+{ stdenv, pkg-config, libevdev }:
 
 stdenv.mkDerivation {
   pname = "mido-navkeys";
-  version = "0.1";
+  version = "0.2";
 
   src = ./.;
 
+  nativeBuildInputs = [ pkg-config ];
+  buildInputs = [ libevdev ];
+
   buildPhase = ''
-    $CC -O2 -Wall -o mido-navkeys main.c
+    $CC -O2 -Wall $(pkg-config --cflags --libs libevdev) -o mido-navkeys main.c
   '';
 
   installPhase = ''
