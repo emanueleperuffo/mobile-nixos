@@ -262,15 +262,15 @@ in
     # The FT5x06 touchscreen exposes the bottom capacitive nav-button strip as
     # ordinary touch coordinates (there are no real KEY_BACK/HOME/MENU events).
     # Translate bottom-strip touch-downs into key events via uinput.
-    # systemd.services.mido-navkeys = {
-    #   description = "mido nav-button to key translation";
-    #   wantedBy = [ "multi-user.target" ];
-    #   serviceConfig = {
-    #     ExecStart = "${pkgs.callPackage ./navkeys { }}/bin/mido-navkeys";
-    #     Restart = "always";
-    #     RestartSec = "2s";
-    #   };
-    # };
+    systemd.services.mido-navkeys = {
+      description = "mido nav-button to key translation";
+      wantedBy = [ "multi-user.target" ];
+      serviceConfig = {
+        ExecStart = "${pkgs.callPackage ./navkeys { }}/bin/mido-navkeys";
+        Restart = "always";
+        RestartSec = "2s";
+      };
+    };
 
     # The stock Android `system` partition is repurposed to hold the stage-1
     # `boot.img` (kernel + initrd) for lk2nd, which is too large for the `boot`
