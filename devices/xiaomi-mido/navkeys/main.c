@@ -207,6 +207,22 @@ static int mapping_for(int x) {
   }
 }
 
+/*
+ * Human-readable name of a nav key, for the console logs.
+ */
+static const char *key_name(int code) {
+  switch (code) {
+  case KEY_MENU_CODE:
+    return "MENU";
+  case KEY_HOME_CODE:
+    return "HOME";
+  case KEY_BACK_CODE:
+    return "BACK";
+  default:
+    return "?";
+  }
+}
+
 int main(int argc, char **argv) {
   char devpath[64];
 
@@ -270,13 +286,13 @@ int main(int argc, char **argv) {
      */
     int wanted = 0;
     int touch = 0;
+    int x = 0, y = 0;
     /* BTN_TOUCH is the "a finger is actually on the panel" flag. Gating on
      * it also avoids stale MT-slot coordinates: after a lift the slot may
      * still hold the last position, and without the gate we would
      * re-trigger the key from leftover data. */
     if (libevdev_fetch_event_value(dev, EV_KEY, BTN_TOUCH, &touch) == 0 &&
         touch) {
-      int x = 0, y = 0;
       /* A press counts only when the finger is exactly on a button
        * position: exact X match AND Y == NAV_Y. */
       if (axis_value(dev, ABS_MT_POSITION_X, ABS_X, &x) &&
@@ -291,10 +307,18 @@ int main(int argc, char **argv) {
      * - leaving / lifting  : release the key
      */
     if (wanted != active_key) {
-      if (active_key)
+      if (active_key) {
+        fprintf(stderr, "navkeys: release %s\n", key_name(active_key));
         emit_key(ufd, active_key, 0);
-      if (wanted)
+      }
+      if (wanted) {
+        /* Log the digitizer coordinates too: they are the exact matched
+         * position, handy for verifying the strip geometry when the three
+         * buttons drift from X=200/500/800, Y=2040 on a panel variant. */
+        fprintf(stderr, "navkeys: press %s (x=%d, y=%d)\n",
+                key_name(wanted), x, y);
         emit_key(ufd, wanted, 1);
+      }
       active_key = wanted;
     }
   }
