@@ -97,7 +97,12 @@
       YAMAHA_YAS530 = no;
       MAX9611 = no;
       SM5708_POWER = no;
-      SND_SOC_APQ8016_SBC = no;
+      # NOTE: despite the name, this is NOT just the APQ8016 (Snapdragon 410)
+      # machine driver: the msm8953-mainline kernel also matches
+      # "qcom,msm8953-qdsp6-sndcard" in apq8016_sbc.c, which is what creates
+      # the sound card for mido (sound-card@c051000 in msm8953.dtsi). Without
+      # it ASoC never assembles a card and ALSA reports "No soundcards found".
+      SND_SOC_APQ8016_SBC = module;
 
       # --- Fallout from the above: selectors and universal-default sub-options ---
       # MFD_AXP20X_I2C selects the AXP20X core back to `y`; HID_PRODIKEYS
