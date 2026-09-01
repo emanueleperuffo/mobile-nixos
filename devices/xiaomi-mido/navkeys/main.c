@@ -1,334 +1,221 @@
-/*
- * mido-navkeys: translate the bottom capacitive nav-button strip of the
- * FocalTech FT5x06 touchscreen into real KEY_BACK / KEY_HOME / KEY_MENU
- * events, injected through uinput.
- *
- * WHY THIS EXISTS
- * --------------
- * The touchscreen driver exposes the whole panel (nav strip included) as a
- * single touchscreen, so pressing the three bottom buttons just produces
- * ordinary touch coordinates - the OS never sees a "button". This daemon
- * watches the touchscreen input device and reinterprets touches that land
- * in the bottom strip as key events.
- *
- * HOW IT WORKS (matches the reference implementation)
- * ---------------------------------------------------
- * The strip's three buttons sit at FIXED positions in the touchscreen's
- * digitizer coordinate space (the digitizer is larger than the 1080x1920
- * display, so the strip sits below the visible area):
- *
- *     X=200 -> KEY_MENU,  X=500 -> KEY_HOME,  X=800 -> KEY_BACK,  Y=2040
- *
- * While the finger is down (BTN_TOUCH held), the daemon repeatedly checks
- * the CURRENT coordinates. If they land exactly on one of those positions,
- * the matching key is pressed and held; as soon as the finger lifts or
- * slides off the position, the key is released. Only one key is held at a
- * time. This gives press-and-hold semantics (e.g. hold HOME for recents).
- *
- * The device is auto-detected (the ft5x06 touchscreen), or can be given
- * explicitly as the first argument (/dev/input/eventN).
- */
-
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <glob.h>
+#include <libevdev/libevdev-uinput.h>
+#include <libevdev/libevdev.h>
 #include <linux/input.h>
-#include <linux/uinput.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/ioctl.h>
 #include <unistd.h>
 
-#include <libevdev/libevdev.h>
+#define TARGET_Y 2040
+#define X_TOLERANCE 50
 
-/* Kernel device node used to create virtual input devices. */
-#define UINPUT_DEV "/dev/uinput"
+static bool verbose = false;
 
-/* Nav-strip button positions, in the touchscreen's coordinate space
- * (values from the reference implementation). The digitizer's Y range is
- * larger than the display's: 2040 is below the 1920-line visible area. */
-#define X_MENU 200
-#define X_HOME 500
-#define X_BACK 800
-#define NAV_Y  2040
+#define LOG_INFO(...) fprintf(stdout, "[INFO] " __VA_ARGS__)
+#define LOG_DBG(...)                                                           \
+  do {                                                                         \
+    if (verbose)                                                               \
+      fprintf(stdout, "[DEBUG] " __VA_ARGS__);                                 \
+  } while (0)
 
-/* Linux input event codes for the keys we synthesize. (uinput.KEY_MENU,
- * KEY_HOME, KEY_BACK in evdev terms.) */
-#define KEY_MENU_CODE 139
-#define KEY_HOME_CODE 102
-#define KEY_BACK_CODE 158
+struct nav_mapping {
+  int center_x;
+  int key_code;
+  const char *name;
+};
 
-/*
- * Find the touchscreen's /dev/input/eventN node by walking /sys.
- *
- * /dev/input/eventN numbering is assigned at boot and can change between
- * reboots, so instead of hardcoding a node we scan all input devices and
- * match on the device NAME (read from sysfs), which is stable.
- */
-static int find_touchscreen(char *out, size_t n) {
-  glob_t g;
-  if (glob("/sys/class/input/event*", 0, NULL, &g) != 0)
-    return -1;
+/* Mappings tailored for Phosh */
+static const struct nav_mapping MAPPINGS[] = {
+    {200, KEY_APPSELECT, "KEY_APPSELECT"}, /* Left:  App Switcher */
+    {500, KEY_LEFTMETA, "KEY_LEFTMETA"},   /* Center: Phosh Home Screen */
+    {800, KEY_BACK, "KEY_BACK"}            /* Right:  Back */
+};
+#define NUM_MAPPINGS (sizeof(MAPPINGS) / sizeof(MAPPINGS[0]))
 
-  for (size_t i = 0; i < g.gl_pathc; i++) {
-    /* /sys/class/input/eventN/device/name holds the human-readable name. */
-    char namepath[256];
-    snprintf(namepath, sizeof(namepath), "%s/device/name", g.gl_pathv[i]);
-    int fd = open(namepath, O_RDONLY);
-    if (fd < 0)
-      continue;
-    char name[128] = {0};
-    ssize_t r = read(fd, name, sizeof(name) - 1);
-    close(fd);
-    if (r <= 0)
-      continue;
-
-    /* The edt-ft5x06 driver exposes itself under a few name variants;
-     * the Goodix controller is intentionally NOT matched (no nav strip). */
-    if (strstr(name, "ft5x06") || strstr(name, "fts") || strstr(name, "edt")) {
-      /* /sys/class/input/eventN -> /dev/input/eventN */
-      const char *leaf = strrchr(g.gl_pathv[i], '/');
-      if (!leaf)
-        continue;
-      snprintf(out, n, "/dev/input%s", leaf);
-      globfree(&g);
-      return 0;
+static int get_key_code(int x, const char **key_name) {
+  for (size_t i = 0; i < NUM_MAPPINGS; i++) {
+    if (x >= MAPPINGS[i].center_x - X_TOLERANCE &&
+        x <= MAPPINGS[i].center_x + X_TOLERANCE) {
+      if (key_name)
+        *key_name = MAPPINGS[i].name;
+      return MAPPINGS[i].key_code;
     }
   }
-  globfree(&g);
-  return -1;
-}
-
-/*
- * Create the virtual input device that receives our synthetic key events.
- *
- * Steps:
- *  1. open /dev/uinput,
- *  2. declare which event types and key codes the device can emit
- *     (UI_SET_EVBIT/UI_SET_KEYBIT),
- *  3. describe it (UI_DEV_SETUP: bus type, vendor/product IDs, name),
- *  4. make it visible to the kernel (UI_DEV_CREATE).
- *
- * From then on, writing input_event structs to the fd is indistinguishable
- * from a real keypad to userspace (compositor, X/Wayland, ...).
- */
-static int create_uinput(void) {
-  int fd = open(UINPUT_DEV, O_WRONLY | O_NONBLOCK);
-  if (fd < 0) {
-    fprintf(stderr, "navkeys: cannot open %s: %s\n", UINPUT_DEV,
-            strerror(errno));
-    return -1;
-  }
-
-  /* We emit only EV_KEY events (plus the EV_SYN markers that frame them). */
-  ioctl(fd, UI_SET_EVBIT, EV_KEY);
-  ioctl(fd, UI_SET_EVBIT, EV_SYN);
-  ioctl(fd, UI_SET_KEYBIT, KEY_MENU_CODE);
-  ioctl(fd, UI_SET_KEYBIT, KEY_HOME_CODE);
-  ioctl(fd, UI_SET_KEYBIT, KEY_BACK_CODE);
-
-  struct uinput_setup setup;
-  memset(&setup, 0, sizeof(setup));
-  setup.id.bustype = BUS_VIRTUAL;
-  setup.id.vendor = 0x1234;
-  setup.id.product = 0x5678;
-  strcpy(setup.name, "mido-navkeys");
-
-  if (ioctl(fd, UI_DEV_SETUP, &setup) < 0 || ioctl(fd, UI_DEV_CREATE) < 0) {
-    fprintf(stderr, "navkeys: uinput setup failed: %s\n", strerror(errno));
-    close(fd);
-    return -1;
-  }
-  return fd;
-}
-
-/*
- * Emit one key event with a trailing SYN_REPORT.
- *
- * value=1 presses the key, value=0 releases it. The EV_SYN/SYN_REPORT
- * frame tells the input stack "this batch of events is complete" - without
- * it the kernel would never deliver the state change to applications.
- */
-static void emit_key(int ufd, int code, int value) {
-  struct input_event ev;
-  memset(&ev, 0, sizeof(ev));
-  ev.type = EV_KEY;
-  ev.code = code;
-  ev.value = value;
-  write(ufd, &ev, sizeof(ev));
-
-  memset(&ev, 0, sizeof(ev));
-  ev.type = EV_SYN;
-  ev.code = SYN_REPORT;
-  write(ufd, &ev, sizeof(ev));
-}
-
-/*
- * Read the CURRENT value of an axis from the device state.
- *
- * We prefer the multitouch axes (ABS_MT_POSITION_*); if the driver does not
- * expose them, fall back to the legacy single-touch axes (ABS_X/ABS_Y).
- * The ft5x06 reports both, with the same values, so the distinction is
- * cosmetic - but covering both keeps the daemon working across driver
- * variants.
- */
-static int axis_value(struct libevdev *dev, int mt_code, int legacy_code,
-                      int *out) {
-  int v = 0;
-  if (libevdev_has_event_code(dev, EV_ABS, mt_code) &&
-      libevdev_fetch_event_value(dev, EV_ABS, mt_code, &v) == 0) {
-    *out = v;
-    return 1;
-  }
-  if (libevdev_has_event_code(dev, EV_ABS, legacy_code) &&
-      libevdev_fetch_event_value(dev, EV_ABS, legacy_code, &v) == 0) {
-    *out = v;
-    return 1;
-  }
+  if (key_name)
+    *key_name = NULL;
   return 0;
 }
 
-/*
- * Map an exact X position to a key code; 0 if no button lives at that X.
- * The reference implementation only matches these exact positions, so a
- * touch between buttons is deliberately NOT a key press.
- */
-static int mapping_for(int x) {
-  switch (x) {
-  case X_MENU:
-    return KEY_MENU_CODE;
-  case X_HOME:
-    return KEY_HOME_CODE;
-  case X_BACK:
-    return KEY_BACK_CODE;
-  default:
-    return 0;
+static char *find_touchscreen_path(void) {
+  DIR *dir = opendir("/dev/input");
+  if (!dir) {
+    perror("Failed to open /dev/input");
+    return NULL;
   }
+
+  struct dirent *ent;
+  char path[256];
+  char *found_path = NULL;
+
+  while ((ent = readdir(dir)) != NULL) {
+    if (strncmp(ent->d_name, "event", 5) != 0)
+      continue;
+
+    snprintf(path, sizeof(path), "/dev/input/%s", ent->d_name);
+    int fd = open(path, O_RDONLY | O_NONBLOCK);
+    if (fd < 0)
+      continue;
+
+    struct libevdev *dev = NULL;
+    if (libevdev_new_from_fd(fd, &dev) < 0) {
+      close(fd);
+      continue;
+    }
+
+    /* Check for touchscreen characteristics: ABS position + BTN_TOUCH */
+    bool has_abs = libevdev_has_event_type(dev, EV_ABS) &&
+                   (libevdev_has_event_code(dev, EV_ABS, ABS_MT_POSITION_X) ||
+                    libevdev_has_event_code(dev, EV_ABS, ABS_X));
+    bool has_touch = libevdev_has_event_type(dev, EV_KEY) &&
+                     libevdev_has_event_code(dev, EV_KEY, BTN_TOUCH);
+
+    LOG_DBG("Checking %s: name=\"%s\", abs=%d, touch=%d\n", path,
+            libevdev_get_name(dev), has_abs, has_touch);
+
+    if (has_abs && has_touch) {
+      found_path = strdup(path);
+      LOG_INFO("Selected touchscreen device: %s (%s)\n", path,
+               libevdev_get_name(dev));
+      libevdev_free(dev);
+      close(fd);
+      break;
+    }
+
+    libevdev_free(dev);
+    close(fd);
+  }
+
+  closedir(dir);
+  return found_path;
 }
 
-/*
- * Human-readable name of a nav key, for the console logs.
- */
-static const char *key_name(int code) {
-  switch (code) {
-  case KEY_MENU_CODE:
-    return "MENU";
-  case KEY_HOME_CODE:
-    return "HOME";
-  case KEY_BACK_CODE:
-    return "BACK";
-  default:
-    return "?";
-  }
+static void send_key(struct libevdev_uinput *uidev, int code, int value,
+                     const char *name) {
+  LOG_INFO("Emitting %s (%d) -> %s\n", name ? name : "KEY", code,
+           value ? "PRESS" : "RELEASE");
+  libevdev_uinput_write_event(uidev, EV_KEY, code, value);
+  libevdev_uinput_write_event(uidev, EV_SYN, SYN_REPORT, 0);
 }
 
 int main(int argc, char **argv) {
-  char devpath[64];
-
-  /* Allow passing the device explicitly (like the reference script), but
-   * keep the auto-detect so the systemd service needs no arguments. */
-  if (argc > 1) {
-    snprintf(devpath, sizeof(devpath), "%s", argv[1]);
-  } else if (find_touchscreen(devpath, sizeof(devpath)) < 0) {
-    fprintf(stderr, "navkeys: touchscreen not found\n");
-    return 1;
+  for (int i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--verbose") == 0) {
+      verbose = true;
+    } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
+      printf("Usage: %s [-v|--verbose]\n", argv[0]);
+      return EXIT_SUCCESS;
+    }
   }
 
-  int tfd = open(devpath, O_RDONLY);
-  if (tfd < 0) {
-    fprintf(stderr, "navkeys: cannot open %s: %s\n", devpath, strerror(errno));
-    return 1;
+  char *device_path = find_touchscreen_path();
+  if (!device_path) {
+    fprintf(stderr,
+            "Error: Could not automatically detect a touchscreen device.\n");
+    return EXIT_FAILURE;
   }
 
-  /* libevdev wraps the raw input protocol: it decodes events, tracks the
-   * device state (pressed keys, axis values), and transparently recovers
-   * from SYN_DROPPED (kernel dropping events when the buffer overflows).
-   * Without it we would have to replicate that state tracking by hand. */
+  int fd = open(device_path, O_RDONLY);
+  if (fd < 0) {
+    perror("Failed to open input device");
+    free(device_path);
+    return EXIT_FAILURE;
+  }
+
   struct libevdev *dev = NULL;
-  if (libevdev_new_from_fd(tfd, &dev) < 0) {
-    fprintf(stderr, "navkeys: libevdev_new_from_fd failed: %s\n",
-            strerror(errno));
-    close(tfd);
-    return 1;
+  if (libevdev_new_from_fd(fd, &dev) < 0) {
+    fprintf(stderr, "Failed to initialize libevdev for %s\n", device_path);
+    free(device_path);
+    close(fd);
+    return EXIT_FAILURE;
   }
 
-  int ufd = create_uinput();
-  if (ufd < 0) {
+  struct libevdev *uidev_raw = libevdev_new();
+  libevdev_set_name(uidev_raw, "pmos-navkeys");
+  libevdev_enable_event_type(uidev_raw, EV_KEY);
+  libevdev_enable_event_code(uidev_raw, EV_KEY, KEY_MENU, NULL);
+  libevdev_enable_event_code(uidev_raw, EV_KEY, KEY_HOME, NULL);
+  libevdev_enable_event_code(uidev_raw, EV_KEY, KEY_BACK, NULL);
+
+  struct libevdev_uinput *uidev = NULL;
+  if (libevdev_uinput_create_from_device(
+          uidev_raw, LIBEVDEV_UINPUT_OPEN_MANAGED, &uidev) < 0) {
+    fprintf(stderr, "Failed to create uinput device\n");
+    libevdev_free(uidev_raw);
     libevdev_free(dev);
-    close(tfd);
-    return 1;
+    free(device_path);
+    close(fd);
+    return EXIT_FAILURE;
   }
+  libevdev_free(uidev_raw);
 
-  fprintf(stderr, "navkeys: watching %s\n", devpath);
+  LOG_INFO("Listening on %s... (press Ctrl+C to exit)\n", device_path);
 
-  /* The key currently held down on our virtual device, or 0 for none. */
+  int cur_x = -1;
+  int cur_y = -1;
+  bool touch_down = false;
   int active_key = 0;
+  const char *active_key_name = NULL;
 
-  for (;;) {
-    struct input_event ev;
+  struct input_event ev;
+  while (1) {
     int rc = libevdev_next_event(dev, LIBEVDEV_READ_FLAG_NORMAL, &ev);
-    if (rc == LIBEVDEV_READ_STATUS_SYNC)
-      continue; /* state is re-read below, once the queue is back in sync */
-    if (rc < 0)
+    if (rc == -EAGAIN)
+      continue;
+    if (rc < 0) {
+      LOG_INFO("Device disconnected or read error (rc=%d)\n", rc);
       break;
-
-    /*
-     * Re-evaluate the CURRENT device state after every event, like the
-     * reference implementation does (it checks active_keys()/absinfo on
-     * each event from read_loop()).
-     *
-     * Why per-event instead of on BTN_TOUCH transitions only? Because the
-     * finger can slide: it may start on a button and slide off (releasing
-     * the key), or slide from one button to another (switching keys).
-     * Re-reading the state each event catches those moves without us
-     * tracking any history.
-     */
-    int wanted = 0;
-    int touch = 0;
-    int x = 0, y = 0;
-    /* BTN_TOUCH is the "a finger is actually on the panel" flag. Gating on
-     * it also avoids stale MT-slot coordinates: after a lift the slot may
-     * still hold the last position, and without the gate we would
-     * re-trigger the key from leftover data. */
-    if (libevdev_fetch_event_value(dev, EV_KEY, BTN_TOUCH, &touch) == 0 &&
-        touch) {
-      /* A press counts only when the finger is exactly on a button
-       * position: exact X match AND Y == NAV_Y. */
-      if (axis_value(dev, ABS_MT_POSITION_X, ABS_X, &x) &&
-          axis_value(dev, ABS_MT_POSITION_Y, ABS_Y, &y) && y == NAV_Y)
-        wanted = mapping_for(x);
     }
 
-    /*
-     * Press-and-hold state machine: we only emit on TRANSITIONS.
-     * - entering a button  : release the previous key (if any), press new
-     * - staying on a button: emit nothing (avoids key-repeat spam)
-     * - leaving / lifting  : release the key
-     */
-    if (wanted != active_key) {
-      if (active_key) {
-        fprintf(stderr, "navkeys: release %s\n", key_name(active_key));
-        emit_key(ufd, active_key, 0);
+    if (ev.type == EV_KEY && ev.code == BTN_TOUCH) {
+      touch_down = (ev.value != 0);
+      LOG_DBG("BTN_TOUCH: %d\n", touch_down);
+    } else if (ev.type == EV_ABS) {
+      if (ev.code == ABS_X || ev.code == ABS_MT_POSITION_X) {
+        cur_x = ev.value;
+      } else if (ev.code == ABS_Y || ev.code == ABS_MT_POSITION_Y) {
+        cur_y = ev.value;
       }
-      if (wanted) {
-        /* Log the digitizer coordinates too: they are the exact matched
-         * position, handy for verifying the strip geometry when the three
-         * buttons drift from X=200/500/800, Y=2040 on a panel variant. */
-        fprintf(stderr, "navkeys: press %s (x=%d, y=%d)\n",
-                key_name(wanted), x, y);
-        emit_key(ufd, wanted, 1);
+    } else if (ev.type == EV_SYN && ev.code == SYN_REPORT) {
+      LOG_DBG("SYN_REPORT frame: touch=%d, x=%d, y=%d\n", touch_down, cur_x,
+              cur_y);
+
+      const char *target_key_name = NULL;
+      int target_key = 0;
+
+      if (touch_down && cur_y == TARGET_Y) {
+        target_key = get_key_code(cur_x, &target_key_name);
       }
-      active_key = wanted;
+
+      if (target_key != active_key) {
+        if (active_key != 0) {
+          send_key(uidev, active_key, 0, active_key_name);
+        }
+        if (target_key != 0) {
+          send_key(uidev, target_key, 1, target_key_name);
+        }
+        active_key = target_key;
+        active_key_name = target_key_name;
+      }
     }
   }
 
-  /* Clean up on exit: never leave a key stuck down. */
-  if (active_key)
-    emit_key(ufd, active_key, 0);
-
-  close(ufd);
+  libevdev_uinput_destroy(uidev);
   libevdev_free(dev);
-  close(tfd);
-  return 0;
+  free(device_path);
+  close(fd);
+  return EXIT_SUCCESS;
 }
