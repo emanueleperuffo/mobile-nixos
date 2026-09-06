@@ -59,6 +59,7 @@ in
     # instead of the family's, so the trims can live per-device.
     mobile.boot.stage-1.kernel.package = (pkgs.callPackage ../families/msm8953-mainline/kernel { }).overrideAttrs {
       configfile = ./kernel/config.aarch64;
+      dtbs = [ "qcom/msm8953-xiaomi-mido.dtb" ];
     };
 
     mobile.hardware.touchscreen = mkDefault "focaltech";

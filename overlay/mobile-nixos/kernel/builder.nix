@@ -77,7 +77,7 @@ let
   modDirify = v: v;
 
   # Shortcuts
-  inherit (lib) concatMapStringsSep optionals optional optionalString;
+  inherit (lib) concatMapStringsSep concatStringsSep optionals optional optionalString;
   platform = stdenv.hostPlatform;
 
   maybeString = str: optionalString (str != null) str;
@@ -172,6 +172,11 @@ in
 
 , buildDTBs ?
     stdenv.hostPlatform.isAarch || stdenv.hostPlatform.isRiscV || stdenv.hostPlatform.isLoongArch64
+
+# Only build and install these DTBs, paths relative to
+# arch/<arch>/boot/dts/ (e.g. "qcom/msm8953-xiaomi-mido.dtb").
+# The default ([]) builds every DTB the kernel config enables.
+, dtbs ? []
 
 , ...
 } @ inputArgs:
@@ -496,9 +501,18 @@ stdenv.mkDerivation (inputArgs // {
     rm -vf "$out/lib/modules/${modDirVersion}/source"
 
   '' + optionalString buildDTBs ''
-    echo ":: Installing DTBs"
-    mkdir -p $out/dtbs/
-    make $makeFlags "''${makeFlagsArray[@]}" dtbs dtbs_install INSTALL_DTBS_PATH=$out/dtbs
+    if [ -n "${concatStringsSep " " dtbs}" ]; then
+      echo ":: Installing selected DTBs"
+      make $makeFlags "''${makeFlagsArray[@]}" ${concatMapStringsSep " " (dtb: "arch/${platform.linuxArch}/boot/dts/${dtb}") dtbs}
+      for d in ${concatStringsSep " " dtbs}; do
+        mkdir -p "$out/dtbs/$(dirname "$d")"
+        cp -v "$buildRoot/arch/${platform.linuxArch}/boot/dts/$d" "$out/dtbs/$d"
+      done
+    else
+      echo ":: Installing DTBs"
+      mkdir -p $out/dtbs/
+      make $makeFlags "''${makeFlagsArray[@]}" dtbs dtbs_install INSTALL_DTBS_PATH=$out/dtbs
+    fi
 
   '' + optionalString isQcdt ''
     echo ":: Making and installing QCDT dt.img"
