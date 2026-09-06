@@ -118,6 +118,17 @@ in
         NFC = no;   # mido has no NFC chip (Redmi Note 4)
         TYPEC = no; # micro-USB port, not Type-C
 
+        # --- Hardware of *other* msm8953-family members, absent on mido ---
+        # (mkForce: the family enables these as modules; a plain value here
+        # would be a conflicting definition.) Everything a mido owner could
+        # actually use — USB OTG peripheral classes (storage/serial/ethernet/
+        # audio), f2fs/btrfs, the MIDI sequencer, USB DisplayLink, ntsync,
+        # speakup — is intentionally left enabled, inherited from the family
+        # as modules.
+        CM3323 = no;        # Asus ZenFone 3 light sensor
+        YAMAHA_YAS530 = no; # xiaomi-markw magnetometer (yas537)
+        SM5708_POWER = no;  # Samsung A6+ charger PMIC
+
         # --- Display panels ---
         # The msm8953-mainline kernel builds generated DSI panel drivers for
         # every device in the family (Asus, Huawei, Motorola, ...). mido only

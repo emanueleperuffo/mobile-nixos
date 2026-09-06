@@ -46,72 +46,49 @@
       SND_SOC_IMX_AUDMUX = no;
 
       # --- Dead weight inherited from the generic upstream defconfig ---
-      # None of these can appear on an msm8953 device (verified against the
-      # device trees and the platform's hardware):
+      # None of these can appear on an msm8953 device:
       #  - server storage: SAS (RAID/HBA), UFS (msm8953 is eMMC-only)
-      #  - unused filesystems: btrfs/f2fs (rootfs is squashfs, data is ext4),
-      #    optical (iso9660/udf), 9p (VM share), fscache/cachefiles
-      #  - USB *host* stack: xhci/ehci (dwc3 is peripheral-only), mass storage,
-      #    serial adapters (incl. LTE dongles), ethernet dongles
+      #  - optical (iso9660/udf), 9p (VM share), fscache/cachefiles
+      #  - EHCI host controller: msm8953's only SoC USB controller is the dwc3,
+      #    whose host role is xHCI (kept below for USB OTG)
       #  - other vendors' PMICs: X-Powers AXP20X, HiSilicon HI6421, NVIDIA
-      #    MAX77620 (mido's PMICs are the Qualcomm SPMI ones)
-      #  - misc: DS3232 RTC, DisplayLink/UDL, LT8912B DSI->HDMI bridge (only
-      #    found on dev-boards like db845c), USB audio, ALSA MIDI sequencer,
-      #    ath10k (msm8953 Wi-Fi is wcn36xx), Speakup, NT sync (Wine),
-      #    IPv6-in-IPv4 sit tunnel, sensors/PMICs of other devices,
-      #    and the apq8016 DragonBoard machine driver (different SoC).
+      #    MAX77620 (all msm8953-family PMICs are Qualcomm SPMI ones)
+      #  - misc: DS3232 RTC, LT8912B DSI->HDMI bridge (only found on dev-boards
+      #    like db845c), ath10k (msm8953 Wi-Fi is wcn36xx), IPv6-in-IPv4 sit
+      #    tunnel, and the apq8016 DragonBoard machine driver (different SoC).
       SCSI_SAS_ATTRS = no;
       SCSI_SAS_LIBSAS = no;
       SCSI_SAS_HOST_SMP = no;
       SCSI_UFSHCD = no;
       SCSI_UFSHCD_PLATFORM = no;
       SCSI_UFS_QCOM = no;
-      F2FS_FS = no;
-      BTRFS_FS = no;
       ISO9660_FS = no;
       UDF_FS = no;
       "9P_FS" = no;
       FSCACHE = no;
       CACHEFILES = no;
-      USB_XHCI_HCD = no;
       USB_EHCI_HCD = no;
-      USB_STORAGE = no;
-      USB_SERIAL = no;
-      USB_NET_DRIVERS = no;
       MFD_AXP20X = no;
       MFD_HI6421_PMIC = no;
       MFD_MAX77620 = no;
       RTC_DRV_DS3232 = no;
-      DRM_UDL = no;
       DRM_LONTIUM_LT8912B = no;
-      SND_USB_AUDIO = no;
-      SND_SEQUENCER = no;
-      SND_RAWMIDI = no;
-      SND_UMP = no;
-      SND_SEQ_UMP = no;
       ATH10K = no;
-      SPEAKUP = no;
-      NTSYNC = no;
       IPV6_SIT = no;
-      CM3323 = no;
-      YAMAHA_YAS530 = no;
+      # MAX9611 has no msm8953-family device tree and stays off.
       MAX9611 = no;
-      SM5708_POWER = no;
       # NOTE: despite the name, this is NOT just the APQ8016 (Snapdragon 410)
       # machine driver: the msm8953-mainline kernel also matches
       # "qcom,msm8953-qdsp6-sndcard" in apq8016_sbc.c, which is what creates
       # the sound card for mido (sound-card@c051000 in msm8953.dtsi). Without
       # it ASoC never assembles a card and ALSA reports "No soundcards found".
-      SND_SOC_APQ8016_SBC = module;
+      # SND_SOC_APQ8016_SBC = module;
 
       # --- Fallout from the above: selectors and universal-default sub-options ---
-      # MFD_AXP20X_I2C selects the AXP20X core back to `y`; HID_PRODIKEYS
-      # (PC-MIDI keyboard) selects SND_RAWMIDI; MOUSE_PS2 (default-y, unpinned)
-      # selects SERIO. And the universal filesystems defaults expect the
-      # following sub-options to be `y`, which cannot hold once their parent is
-      # off — pin them off explicitly.
+      # MOUSE_PS2 (default-y, unpinned) selects SERIO. And the universal filesystems
+      # defaults expect the following sub-options to be `y`, which cannot hold
+      # once their parent is off — pin them off explicitly.
       MFD_AXP20X_I2C = no;
-      HID_PRODIKEYS = no;
       MOUSE_PS2 = no;
       # The SERIO chain: HID_RMI (Synaptics RMI4 over i2c-hid/usbhid, dead on
       # phones) selects RMI4_F03, which enables RMI4_F03_SERIO — and F03_SERIO
@@ -132,25 +109,16 @@
       USB_EHCI_ROOT_HUB_TT = no;
       USB_EHCI_TT_NEWSCHED = no;
 
-      # PMI8950 fuel gauge driver (binds qcom,pmi8996-fg -> mido's
-      # fuel-gauge@4000) exposes battery capacity/voltage/current/temp.
-      BATTERY_PMI8994_FG = yes;
-
-      # Vibrator: mido's &pmi8950_haptics is enabled in the DT, so the
-      # Qualcomm SPMI haptics driver must be built or there is no haptic
-      # feedback (vibrations on tap/etc.).
-      INPUT_QCOM_SPMI_HAPTICS = yes;
-
       # IR blaster: mido has a pwm-ir-tx node (used as a TV/remote
       # transmitter). It needs the RC core + LIRC (raw IR userland, a
       # dependency of IR_PWM_TX). The PWM itself is provided by the LPG
       # driver (qcom,pmi8950-pwm) which is already enabled as a module.
       # RC_DEVICES is the menu that contains IR_PWM_TX; without it oldconfig
       # drops the transmitter symbol.
-      RC_CORE = yes;
+      RC_CORE = module;
       RC_DEVICES = yes;
       LIRC = yes;
-      IR_PWM_TX = yes;
+      IR_PWM_TX = module;
 
       CC_OPTIMIZE_FOR_PERFORMANCE = no;
       CC_OPTIMIZE_FOR_SIZE = yes;
