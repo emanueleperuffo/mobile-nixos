@@ -1,0 +1,73 @@
+diff --git a/app/aboot/aboot.c b/app/aboot/aboot.c
+index b44a5c2..2c2a53f 100644
+--- a/app/aboot/aboot.c
++++ b/app/aboot/aboot.c
+@@ -1086,8 +1086,34 @@ unsigned char *update_cmdline(const char * cmdline)
+ static unsigned char *update_cmdline2(const char *cmdline, enum boot_type boot_type)
+ {
+ #if GENERATE_CMDLINE_ONLY_FOR_ANDROID
+-	if (!(boot_type & (BOOT_ANDROID | BOOT_LK2ND)))
++	if (!(boot_type & (BOOT_ANDROID | BOOT_LK2ND))) {
++#if WITH_LK2ND_DEVICE_2ND
++		/*
++		 * The command line from the primary bootloader is normally
++		 * dropped here to keep the kernel command line clean for
++		 * non-Android images. The androidboot.mode=charger token is
++		 * the only way the OS can tell an off-mode charging boot
++		 * (powered on from USB, without the power key) apart from a
++		 * regular boot, so forward just that one token when the
++		 * primary bootloader set it.
++		 */
++		const char *previous = lk2nd_device_get_cmdline();
++		if (previous &&
++		    strstr(previous, "androidboot.mode=charger") &&
++		    !strstr(cmdline, "androidboot.mode=charger")) {
++			unsigned char *charger_cmdline;
++			charger_cmdline = malloc(strlen(cmdline) +
++						 strlen(" androidboot.mode=charger") + 1);
++			if (charger_cmdline) {
++				strcpy((char *)charger_cmdline, cmdline);
++				strcat((char *)charger_cmdline,
++				       " androidboot.mode=charger");
++				return charger_cmdline;
++			}
++		}
++#endif
+ 		return (unsigned char*)strdup(cmdline);
++	}
+ #endif
+ #if WITH_LK2ND_DEVICE
+ 	return lk2nd_device_update_cmdline(cmdline, boot_type);
+diff --git a/lk2nd/device/device.c b/lk2nd/device/device.c
+index 9e30948..c94d7ae 100644
+--- a/lk2nd/device/device.c
++++ b/lk2nd/device/device.c
+@@ -217,6 +217,13 @@ unsigned char *lk2nd_device_update_cmdline(const char *cmdline, enum boot_type b
+ 	return update_cmdline(cmdline);
+ }
+ 
++#if WITH_LK2ND_DEVICE_2ND
++const char *lk2nd_device_get_cmdline(void)
++{
++	return lk2nd_dev.cmdline;
++}
++#endif
++
+ static void lk2nd_device_fastboot_register(void)
+ {
+ 	if (lk2nd_dev.compatible)
+diff --git a/lk2nd/include/lk2nd/device.h b/lk2nd/include/lk2nd/device.h
+index 4c33986..4572611 100644
+--- a/lk2nd/include/lk2nd/device.h
++++ b/lk2nd/include/lk2nd/device.h
+@@ -6,6 +6,10 @@
+ 
+ unsigned char *lk2nd_device_update_cmdline(const char *cmdline, enum boot_type boot_type);
+ 
++#if WITH_LK2ND_DEVICE_2ND
++const char *lk2nd_device_get_cmdline(void);
++#endif
++
+ bool lk2nd_device2nd_have_atags(void) __PURE;
+ void lk2nd_device2nd_copy_atags(void *tags, const char *cmdline,
+ 				void *ramdisk, unsigned ramdisk_size);

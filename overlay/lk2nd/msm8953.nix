@@ -48,6 +48,7 @@ in stdenv.mkDerivation {
     ./msm8953-touchscreen.patch
     ./msm8953-fbcon.patch
     ./msm8953-system-boot.patch
+    ./msm8953-charger-mode.patch
   ];
 
   installPhase = ''
