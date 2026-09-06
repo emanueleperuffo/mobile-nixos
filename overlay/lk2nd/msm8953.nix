@@ -46,7 +46,6 @@ in stdenv.mkDerivation {
   # `mobile.hardware.touchscreen`), which supports both controllers.
   patches = [
     ./msm8953-touchscreen.patch
-    ./msm8953-fbcon.patch
     ./msm8953-system-boot.patch
     ./msm8953-charger-mode.patch
   ];
@@ -67,6 +66,8 @@ in stdenv.mkDerivation {
     # Skip QCDT generation (see the postmarketOS APKBUILD: msm8953 is built
     # with `LK2ND_QCDTBS=""` to work around a regression on some devices).
     "LK2ND_QCDTBS="
+    # Print the lk2nd debug log to the display.
+    "DEBUG_FBCON=1"
     "lk2nd-msm8953"
   ];
 
