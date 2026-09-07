@@ -102,10 +102,44 @@ in
           ${pkgs.kmod}/bin/modprobe qcom_q6v5_mss || true
           ${pkgs.kmod}/bin/modprobe wcn36xx || true
 
-          # Kick the remoteprocs that probed-and-failed at boot (before the
-          # firmware was available) so they now load wcnss.mdt / mba.mbn /
-          # modem.mdt. Failures are ignored (e.g. the modem needs rmtfs first).
-          for r in /sys/class/remoteproc/*/; do
+          # (Re)start the auto-booting DSPs (adsp/wcnss) that may have probed
+          # before the firmware was in place. The modem (qcom-q6v5-mss) is
+          # deliberately excluded here: it must not boot before rmtfs is
+          # serving its EFS/NV, so it is started by mobile-msm8953-modem.service
+          # instead. Failures are ignored.
+          for r in /sys/class/remoteproc/remoteproc*/; do
+            drv=$(readlink -f "$r/device/driver" 2>/dev/null || true)
+            case "$drv" in */qcom-q6v5-mss) continue ;; esac
+            state=$(cat "$r/state" 2>/dev/null || true)
+            [ "$state" = running ] && continue
+            echo start > "$r/state" 2>/dev/null || true
+          done
+        '';
+      };
+
+      # Start the modem (mss) remoteproc. Unlike adsp/wcnss it does not
+      # auto-boot from its driver, and it must not be started by the firmware
+      # service above: the modem firmware asks rmtfs for its EFS/NV shortly
+      # after booting, so starting it before rmtfs is up would race it.
+      mobile-msm8953-modem = {
+        description = "Start the msm8953 modem remoteproc";
+        wantedBy = [ "multi-user.target" ];
+        requires = [ "mobile-msm8953-firmware.service" "rmtfs.service" ];
+        after = [ "mobile-msm8953-firmware.service" "rmtfs.service" ];
+        before = [ "msm-modem-uim-selection.service" "ModemManager.service" ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+        };
+        script = ''
+          set -eu
+          for r in /sys/class/remoteproc/remoteproc*/; do
+            drv=$(readlink -f "$r/device/driver" 2>/dev/null || true)
+            case "$drv" in */qcom-q6v5-mss) : ;; *) continue ;; esac
+            state=$(cat "$r/state" 2>/dev/null || true)
+            [ "$state" = running ] && continue
+            # A crashed instance must be stopped before it can be restarted.
+            [ "$state" = crashed ] && echo stop > "$r/state" 2>/dev/null || true
             echo start > "$r/state" 2>/dev/null || true
           done
         '';
@@ -123,12 +157,62 @@ in
         requires = [ "qrtr-ns.service" ];
         after = [ "qrtr-ns.service" ];
         serviceConfig = {
-          # TODO: msm8953's rmtfs region source (partition vs directory) needs
-          # to be validated on-device; `-P` reads the modem's memory regions
-          # from a partition.
+          # `-P` serves the modem's EFS/NV from the raw modemst1/modemst2/fsc/
+          # fsg partitions (resolved by partlabel), `-r` keeps them read-only
+          # (writes go to a shadow buffer), `-s` stops the modem cleanly when
+          # the service shuts down.
           ExecStart = "${pkgs.rmtfs}/bin/rmtfs -s -r -P";
           Restart = "always";
           RestartSec = "1";
+        };
+      };
+
+      # The modem does not create a primary-GW UIM provisioning session by
+      # itself (on stock Android the RIL does this on every boot). Without one,
+      # ModemManager's unlock-status check reports "no card" and parks the
+      # modem in a failed/sim-missing state. Activate the session for the first
+      # slot holding a card (same approach as the sdm845 qualcomm module)
+      # before MM starts. Only runs when ModemManager is enabled.
+      msm-modem-uim-selection = {
+        enable = true;
+        before = [ "ModemManager.service" ];
+        wantedBy = [ "ModemManager.service" ];
+        requires = [ "mobile-msm8953-modem.service" ];
+        after = [ "mobile-msm8953-modem.service" "rmtfs.service" ];
+        path = with pkgs; [ libqmi gawk ];
+        script = ''
+          QMICLI_MODEM="qmicli --silent -pd qrtr://0"
+
+          # The modem takes a few seconds after remoteproc start to register on
+          # QRTR and bring UIM up; wait for the card status to answer (bounded).
+          i=0
+          while [ $i -lt 30 ]; do
+            if QMI_CARDS=$($QMICLI_MODEM --uim-get-card-status 2>/dev/null); then
+              break
+            fi
+            i=$((i + 1))
+            sleep 2
+          done
+
+          # No answer within the timeout: leave MM to its own retry loop.
+          [ -n "$QMI_CARDS" ] || exit 0
+
+          # If a session already exists, drop it first so the activation below
+          # starts from a clean state.
+          if ! printf "%s" "$QMI_CARDS" | grep -Fq "Primary GW:   session doesn't exist"; then
+            $QMICLI_MODEM --uim-change-provisioning-session='activate=no,session-type=primary-gw-provisioning' >/dev/null 2>&1 || true
+          fi
+
+          FIRST_PRESENT_SLOT=$(printf "%s" "$QMI_CARDS" | grep "Card state: 'present'" -m1 -B1 | head -n1 | cut -c7-7)
+          FIRST_PRESENT_AID=$(printf "%s" "$QMI_CARDS" | grep "usim (2)" -m1 -A3 | tail -n1 | awk '{print $1}')
+
+          if [ -n "$FIRST_PRESENT_SLOT" ] && [ -n "$FIRST_PRESENT_AID" ]; then
+            $QMICLI_MODEM --uim-change-provisioning-session="slot=$FIRST_PRESENT_SLOT,activate=yes,session-type=primary-gw-provisioning,aid=$FIRST_PRESENT_AID"
+          fi
+        '';
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
         };
       };
 
@@ -140,7 +224,7 @@ in
       # remoteproc boots.
       ModemManager = {
         wantedBy = [ "multi-user.target" ];
-        after = [ "qrtr-ns.service" "rmtfs.service" "mobile-msm8953-firmware.service" ];
+        after = [ "qrtr-ns.service" "rmtfs.service" "mobile-msm8953-firmware.service" "mobile-msm8953-modem.service" "msm-modem-uim-selection.service" ];
         requires = [ "mobile-msm8953-firmware.service" ];
         serviceConfig = {
           Restart = "always";
