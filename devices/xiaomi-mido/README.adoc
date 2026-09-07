@@ -73,11 +73,13 @@ managed by NetworkManager using the `iwd` backend:
 
 === Cellular modem
 
-The modem runs on `qrtr-ns` and `rmtfs` (which shares the modem's EFS/NV
-region), and is managed by ModemManager through NetworkManager.
+The modem runs over the kernel's QRTR transport with `rmtfs` (which shares
+the modem's EFS/NV region), and is managed by ModemManager through
+NetworkManager. (The kernel provides the QRTR name service, so no userspace
+`qrtr-ns` daemon is needed.)
 
-ModemManager is *opt-in*: the device/family wires up the transport (`qrtr-ns`,
-`rmtfs`, the firmware copy) and shapes the ModemManager service (pulled into
+ModemManager is *opt-in*: the device/family wires up the transport (`rmtfs`,
+the firmware copy) and shapes the ModemManager service (pulled into
 normal boot, restarting until the modem appears on QRTR), but does not start
 it. Activate it in your `configuration.nix`:
 
@@ -104,7 +106,7 @@ ModemManager's voice API. To try it, run the daemon as a service from your
   systemd.services.q6voiced = {
     description = "QDSP6 voice daemon";
     wantedBy = [ "multi-user.target" ];
-    after = [ "ModemManager.service" "qrtr-ns.service" ];
+    after = [ "ModemManager.service" ];
     serviceConfig = {
       ExecStart = "${pkgs.q6voiced}/bin/q6voiced";
       Restart = "always";

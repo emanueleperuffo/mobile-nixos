@@ -45,7 +45,7 @@ in
 
       Mounts the stock `modem` and `persist` partitions read-only (below
       `/run/mnt`, at boot) and copies their firmware into `/lib/firmware`, then
-      runs the modem userspace stack (qrtr, rmtfs).
+      runs the modem userspace stack (rmtfs, ModemManager).
 
       The firmware is loaded from the device's own partitions at runtime; it is
       not embedded in the image.
@@ -74,7 +74,7 @@ in
       mobile-msm8953-firmware = {
         description = "Expose msm8953 modem/WCNSS firmware to the kernel";
         wantedBy = [ "multi-user.target" ];
-        before = [ "qrtr-ns.service" "rmtfs.service" "ModemManager.service" "NetworkManager.service" ];
+        before = [ "rmtfs.service" "ModemManager.service" "NetworkManager.service" ];
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
@@ -145,17 +145,13 @@ in
         '';
       };
 
-      qrtr-ns = {
-        serviceConfig = {
-          ExecStart = "${pkgs.qrtr}/bin/qrtr-ns -f 1";
-          Restart = "always";
-        };
-      };
-
+      # Serve the modem's EFS/NV from the modemst1/modemst2/fsc/fsg partitions.
+      # rmtfs has no ordering dependencies of its own (it only answers QMI
+      # requests from the modem; the kernel provides the QRTR name service).
+      # The ordering that matters is the reverse one: mobile-msm8953-modem
+      # starts the modem only after this service is up.
       rmtfs = {
         wantedBy = [ "multi-user.target" ];
-        requires = [ "qrtr-ns.service" ];
-        after = [ "qrtr-ns.service" ];
         serviceConfig = {
           # `-P` serves the modem's EFS/NV from the raw modemst1/modemst2/fsc/
           # fsg partitions (resolved by partlabel), `-r` keeps them read-only
@@ -224,7 +220,7 @@ in
       # remoteproc boots.
       ModemManager = {
         wantedBy = [ "multi-user.target" ];
-        after = [ "qrtr-ns.service" "rmtfs.service" "mobile-msm8953-firmware.service" "mobile-msm8953-modem.service" "msm-modem-uim-selection.service" ];
+        after = [ "rmtfs.service" "mobile-msm8953-firmware.service" "mobile-msm8953-modem.service" "msm-modem-uim-selection.service" ];
         requires = [ "mobile-msm8953-firmware.service" ];
         serviceConfig = {
           Restart = "always";

@@ -80,14 +80,21 @@ in
       };
     };
 
+    # Adreno 506 (GPU/DRM) firmware: ZAP shader + a530 microcode. Present both
+    # in stage-1 (the msm driver probes in the initrd) and on the rootfs: the
+    # driver re-requests the ZAP from /lib/firmware at runtime (e.g. on resume),
+    # where the initrd copy is no longer visible.
+    mobile.device.firmware = pkgs.callPackage ./firmware { };
+
     mobile.boot.stage-1.firmware = [
-      # Adreno 506 (GPU/DRM) firmware: ZAP shader + a530 microcode, stage-1.
-      (pkgs.callPackage ./firmware { })
+      config.mobile.device.firmware
     ];
 
     # Wireless regulatory database for cfg80211 (Wi-Fi channels/TX power per
-    # country). Wired into the rootfs /lib/firmware so the kernel can find it.
+    # country) plus the Adreno firmware, wired into the rootfs /lib/firmware so
+    # the kernel can find them at runtime.
     hardware.firmware = [
+      config.mobile.device.firmware
       pkgs.wireless-regdb
     ];
 
