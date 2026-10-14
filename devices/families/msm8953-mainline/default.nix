@@ -62,7 +62,10 @@
       SCSI_UFSHCD = no;
       SCSI_UFSHCD_PLATFORM = no;
       SCSI_UFS_QCOM = no;
+      CDROM = no;
+      BLK_DEV_SR = no;
       ISO9660_FS = no;
+      JOLIET = no;
       UDF_FS = no;
       "9P_FS" = no;
       FSCACHE = no;
