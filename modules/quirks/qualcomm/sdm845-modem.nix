@@ -27,6 +27,12 @@ let
   withPDMapper = any id [
     cfg.sdm845-modem.enable
   ];
+
+  # pd-mapper is built from the mobile-nixos-local package kept next to this
+  # module: it does not exist in nixpkgs, and it carries a patch pointing the
+  # firmware lookup at the uncompressed-firmware share (nixpkgs compresses
+  # hardware.firmware with zstd, which this DSP's userspace cannot read).
+  pd-mapper = pkgs.callPackage ./qrtr/pd-mapper.nix { };
 in
 {
   options.mobile = {
@@ -48,8 +54,9 @@ in
   config = mkIf (anyCompatible) {
     # Makes platform-specific firmware files available in an uncompressed form at:
     # /run/current-system/sw/share/uncompressed-firmware/qcom/sdm845/
-    # This is used by userspace components unaware of the possible xz compression.
-    # See also: tqftpserv and pd-mapper patches.
+    # This is used by userspace components unable to read the compressed firmware
+    # (nixpkgs zstd-compresses the `hardware.firmware` environment).
+    # See also: the patched pd-mapper (modules/quirks/qualcomm/qrtr/pd-mapper.nix).
     environment.pathsToLink = [ "/share/uncompressed-firmware" ];
     # This package added to the environment will select a few firmware path to keep uncompressed.
     environment.systemPackages = [
@@ -118,7 +125,7 @@ in
         requires = [ "qrtr-ns.service" ];
         after = [ "qrtr-ns.service" ];
         serviceConfig = {
-          ExecStart = "${pkgs.pd-mapper}/bin/pd-mapper";
+          ExecStart = "${pd-mapper}/bin/pd-mapper";
           Restart = "always";
         };
       };

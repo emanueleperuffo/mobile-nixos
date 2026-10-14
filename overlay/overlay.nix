@@ -44,12 +44,7 @@ in
     libusbgx = callPackage ./libusbgx {};
     gadget-tool = callPackage ./gt {}; # upstream this is called "gt", which is very Unix.
 
-    qrtr = callPackage ./qrtr/qrtr.nix { };
-    qmic = callPackage ./qrtr/qmic.nix { };
-    tqftpserv = callPackage ./qrtr/tqftpserv.nix { };
-    pd-mapper = callPackage ./qrtr/pd-mapper.nix { };
-    rmtfs = callPackage ./qrtr/rmtfs.nix { };
-    q6voiced = callPackage ./q6voiced.nix { };
+    q6voiced = callPackage ./q6voiced.nix {};
 
     lk2ndMsm8953 = callPackage ./lk2nd/msm8953.nix {};
 
