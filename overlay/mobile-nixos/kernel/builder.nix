@@ -283,7 +283,7 @@ stdenv.mkDerivation (inputArgs // {
     if [ -f scripts/gcc-plugins/gen-random-seed.sh ]; then
       substituteInPlace scripts/gcc-plugins/gen-random-seed.sh \
         --replace NIXOS_RANDSTRUCT_SEED \
-        $(echo ${src} ${configfile} | sha256sum | cut -d ' ' -f 1 | tr -d '\n')
+        $(echo ${src} $configfile | sha256sum | cut -d ' ' -f 1 | tr -d '\n')
     fi
 
     echo ":: Removing default OEM-provided certificates"
@@ -354,7 +354,7 @@ stdenv.mkDerivation (inputArgs // {
     fi
 
     # Catting so we can write to the config file
-    cat ${configfile} > $buildRoot/.config
+    cat $configfile > $buildRoot/.config
 
     if [ -n "$updateConfigFromStructuredConfig" ]; then
       cat <<EOF >> $buildRoot/.config
@@ -501,10 +501,10 @@ stdenv.mkDerivation (inputArgs // {
     rm -vf "$out/lib/modules/${modDirVersion}/source"
 
   '' + optionalString buildDTBs ''
-    if [ -n "${concatStringsSep " " dtbs}" ]; then
+    if [ -n "$dtbs" ]; then
       echo ":: Installing selected DTBs"
-      make $makeFlags "''${makeFlagsArray[@]}" ${concatMapStringsSep " " (dtb: "arch/${platform.linuxArch}/boot/dts/${dtb}") dtbs}
-      for d in ${concatStringsSep " " dtbs}; do
+      make $makeFlags "''${makeFlagsArray[@]}" $(for d in $dtbs; do echo arch/${platform.linuxArch}/boot/dts/$d; done)
+      for d in $dtbs; do
         mkdir -p "$out/dtbs/$(dirname "$d")"
         cp -v "$buildRoot/arch/${platform.linuxArch}/boot/dts/$d" "$out/dtbs/$d"
       done
