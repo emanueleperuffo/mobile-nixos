@@ -503,7 +503,11 @@ stdenv.mkDerivation (inputArgs // {
   '' + optionalString buildDTBs ''
     if [ -n "$dtbs" ]; then
       echo ":: Installing selected DTBs"
-      make $makeFlags "''${makeFlagsArray[@]}" $(for d in $dtbs; do echo arch/${platform.linuxArch}/boot/dts/$d; done)
+      # The `dtbs` entries are paths relative to the DTS directory (e.g.
+      # "qcom/msm8953-xiaomi-mido.dtb"). The kernel's top-level `%.dtb` rule
+      # prepends arch/<arch>/boot/dts/ on its own, so passing the full path
+      # here would double the prefix.
+      make $makeFlags "''${makeFlagsArray[@]}" $dtbs
       for d in $dtbs; do
         mkdir -p "$out/dtbs/$(dirname "$d")"
         cp -v "$buildRoot/arch/${platform.linuxArch}/boot/dts/$d" "$out/dtbs/$d"
